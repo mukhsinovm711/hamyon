@@ -9,7 +9,7 @@
  */
 const Bank = (() => {
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-  let pending = [];   // [id, date, amount, cur, note, bank, kind, key]
+  let pending = [];   // [id, date, amount, cur, note, bank, kind, key, details, сумма по выписке, если изменена]
   let processed = []; // уже записанные операции из последней загруженной выписки
 
   const KIND_LABELS = { card: 'Покупка', transfer: 'Перевод', fee: 'Комиссия', cash: 'Снятие наличных', other: 'Списание' };
@@ -225,12 +225,12 @@ const Bank = (() => {
     if (withExpenses) Store.save('exp', expenses);
   }
 
-  // Расход: [id, date, amount, cur, note, ключ банковской операции, детали из выписки]
+  // Расход: [id, date, amount, cur, note, ключ банковской операции, детали из выписки, сумма по выписке]
   function resolve(ids, accept) {
     const set = new Set(ids);
     if (accept) {
       pending.filter((p) => set.has(p[0]))
-        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || []]));
+        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || [], p[9] ?? null]));
     }
     pending = pending.filter((p) => !set.has(p[0]));
     persist(accept);
@@ -242,7 +242,7 @@ const Bank = (() => {
     return `<div class="pitem pressable${done ? ' done' : ''}" data-detail="${done ? 'proc' : 'pend'}:${esc(p[0])}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
-      <div class="a neg">−${fmt(p[2], p[3])}</div>
+      ${amountHtml(p[2], done ? null : p[9], p[3])}
       ${done ? '<span class="status">✓ Обработан</span>' : `<div class="pbtns">
         <button class="pb ok" data-ok="${esc(p[0])}" aria-label="Подтвердить">✓</button>
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
@@ -325,12 +325,22 @@ const Bank = (() => {
     const p = (kind === 'pend' ? pending : processed).find((x) => x[0] === id);
     if (!p) return null;
     return {
-      title: p[4], amount: -p[2], cur: p[3], pendingId: kind === 'pend' ? p[0] : null,
+      title: p[4], amount: p[2], orig: kind === 'pend' ? p[9] ?? null : null, cur: p[3],
+      pendingId: kind === 'pend' ? p[0] : null, ref: kind === 'pend' ? { type: 'pend', id } : null,
       fields: [['Дата', fmtDate(p[1])], ['Банк', p[5]], ['Вид', KIND_LABELS[p[6]] || ''],
         ['Статус', kind === 'pend' ? 'Ожидает подтверждения' : '✓ Обработан'],
         ...(p[8] || [['Описание', p[4]]])],
     };
   }
+
+  function setAmount(id, value) {
+    const p = pending.find((x) => x[0] === id); if (!p) return;
+    applyAmount(p, 9, value);
+    persist(false);
+  }
+
+  // Ключ операции из блока «Уже обработаны» — чтобы найти подтверждённый расход
+  const keyOf = (id) => (processed.find((x) => x[0] === id) || [])[7];
 
   function decide(id, accept) {
     const p = pending.find((x) => x[0] === id); if (!p) return;
@@ -339,5 +349,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, detailOf, decide, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, detailOf, decide, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

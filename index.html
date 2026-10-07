@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <main id="app">
@@ -196,21 +196,30 @@
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet-grip"></div>
       <div class="sheet-title" id="sheet-title"></div>
-      <div class="sheet-amount" id="sheet-amount"></div>
+      <div class="sheet-amount-row">
+        <div class="sheet-amount" id="sheet-amount"></div>
+        <button class="link" id="sheet-edit">✎ Изменить сумму</button>
+      </div>
+      <div class="sheet-orig hidden" id="sheet-orig">
+        <s id="sheet-orig-val"></s> <span class="muted">— исходная сумма</span> · <button class="link" id="sheet-restore">Вернуть</button>
+      </div>
+      <form class="amount-row hidden" id="sheet-editbox">
+        <input type="number" inputmode="decimal" step="0.01" min="0" class="input" id="sheet-input" placeholder="Новая сумма">
+        <button type="submit" class="btn primary">Сохранить</button>
+      </form>
       <dl class="sheet-fields" id="sheet-fields"></dl>
       <div class="amount-row hidden" id="sheet-decide">
         <button class="btn ok" id="sheet-ok">✓ Подтвердить</button>
         <button class="btn danger" id="sheet-no">✕ Отклонить</button>
       </div>
       <div class="amount-row">
-        <button class="btn" id="sheet-copy">Скопировать</button>
         <button class="btn ghost" id="sheet-close">Закрыть</button>
       </div>
     </div>
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=9"></script>
-  <script src="app.js?v=9"></script>
+  <script src="banks.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

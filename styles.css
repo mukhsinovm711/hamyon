@@ -252,3 +252,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 .sheet-fields dt { color: var(--hint); font-size: 13px; }
 .sheet-fields dd { margin: 0; font-size: 14px; word-break: break-word; -webkit-user-select: text; user-select: text; }
 .btn.ok { background: color-mix(in srgb, #2eb85c 16%, transparent); color: #2eb85c; }
+
+/* Изменённая сумма */
+.a s.orig, .a .orig { display: block; font-size: 11px; font-weight: 400; color: var(--hint); text-align: right; }
+.sheet { -webkit-user-select: text; user-select: text; }
+.sheet button { -webkit-user-select: none; user-select: none; }
+.sheet-amount-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sheet-orig { font-size: 14px; margin-top: -6px; }
+.sheet-orig s { color: var(--hint); }
+#sheet-editbox .btn { flex: 0 0 auto; width: auto; padding: 10px 16px; }

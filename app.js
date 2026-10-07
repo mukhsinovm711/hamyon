@@ -529,7 +529,7 @@ function renderMore() {
     return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}</span><span>${fmt(sum(g))}</span></div>`
       + g.map((r) => { const x = exp(r);
         return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
-          <div style="display:flex;align-items:center;gap:6px"><div class="a neg">−${fmt(x.amount, x.cur)}</div><button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
+          <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || '<div class="empty-state">Расходов за этот год нет</div>';
 
@@ -561,26 +561,47 @@ $('#expense-list').addEventListener('click', async (e) => {
 });
 
 /* ================= Подробности операции =================
- * Удержание строки 3 секунды открывает окно со всеми данными и копированием.
+ * Удержание строки 3 секунды открывает окно со всеми данными.
+ * Сумму можно изменить: в расчётах участвует новая, исходная хранится отдельно.
  */
 const HOLD_MS = 3000;
 let sheetData = null;
+
+// rec[2] — сумма для расчётов, rec[origIdx] — исходная сумма (пока не вернули её обратно)
+function applyAmount(rec, origIdx, value) {
+  if (rec[origIdx] == null) rec[origIdx] = rec[2];
+  rec[2] = value;
+  if (rec[origIdx] === value) rec[origIdx] = null;
+}
+
+const amountHtml = (amount, orig, cur) => `<div class="a neg">−${fmt(amount, cur)}${orig != null
+  ? `<s class="orig">−${fmt(orig, cur)}</s>` : ''}</div>`;
 
 function expenseDetail(id) {
   const r = expenses.find((x) => x[0] === id);
   if (!r) return null;
   const x = exp(r);
   return {
-    title: x.note || 'Расход', amount: -x.amount, cur: x.cur, pendingId: null,
+    title: x.note || 'Расход', amount: x.amount, orig: r[7] ?? null, cur: x.cur, pendingId: null,
+    ref: { type: 'exp', id },
     fields: [['Дата', fmtDate(x.date)], ['Статус', r[5] ? 'Подтверждён из выписки' : 'Добавлен вручную'],
       ...(r[6] && r[6].length ? r[6] : [['Комментарий', x.note || '']])],
   };
 }
 
+function detailByRef(ref) {
+  return ref.type === 'pend' ? Bank.detailOf('pend', ref.id) : expenseDetail(ref.id);
+}
+
 function openSheet(d) {
   sheetData = d;
   $('#sheet-title').textContent = d.title;
-  $('#sheet-amount').textContent = (d.amount < 0 ? '−' : '') + fmt(Math.abs(d.amount), d.cur);
+  $('#sheet-amount').textContent = '−' + fmt(d.amount, d.cur);
+  $('#sheet-orig').classList.toggle('hidden', d.orig == null);
+  if (d.orig != null) $('#sheet-orig-val').textContent = '−' + fmt(d.orig, d.cur);
+  $('#sheet-edit').classList.toggle('hidden', !d.ref);
+  $('#sheet-edit').textContent = '✎ Изменить сумму';
+  $('#sheet-editbox').classList.add('hidden');
   $('#sheet-fields').innerHTML = d.fields.filter(([, v]) => v).map(([k, v]) =>
     `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   $('#sheet-decide').classList.toggle('hidden', !d.pendingId);
@@ -594,22 +615,39 @@ function closeSheet() {
   setTimeout(() => $('#sheet').classList.add('hidden'), 200);
 }
 
-async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); return; } catch (e) { /* в WebView Telegram может не работать */ }
-  const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+function saveAmount(value) {
+  const { ref } = sheetData;
+  if (ref.type === 'pend') Bank.setAmount(ref.id, value);
+  else {
+    const r = expenses.find((x) => x[0] === ref.id);
+    applyAmount(r, 7, value);
+    Store.save('exp', expenses);
+  }
+  haptic();
+  render();
+  openSheet(detailByRef(ref));
 }
 
 $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
 $('#sheet-close').addEventListener('click', closeSheet);
-$('#sheet-copy').addEventListener('click', async () => {
-  if (!sheetData) return;
-  const d = sheetData;
-  const text = [d.title, $('#sheet-amount').textContent, ...d.fields.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`)].join('\n');
-  await copyText(text);
-  haptic();
-  toast('Скопировано');
+$('#sheet-edit').addEventListener('click', () => {
+  const box = $('#sheet-editbox');
+  const opening = box.classList.contains('hidden');
+  box.classList.toggle('hidden', !opening);
+  $('#sheet-edit').textContent = opening ? 'Отмена' : '✎ Изменить сумму';
+  if (opening) { $('#sheet-input').value = sheetData.amount; $('#sheet-input').focus(); $('#sheet-input').select(); }
+});
+$('#sheet-editbox').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = Math.round(parseFloat(String($('#sheet-input').value).replace(',', '.')) * 100) / 100;
+  if (!(v >= 0)) return toast('Введите сумму');
+  saveAmount(v);
+  toast('Сумма изменена');
+});
+$('#sheet-restore').addEventListener('click', () => {
+  if (sheetData.orig == null) return;
+  saveAmount(sheetData.orig);
+  toast('Возвращена сумма из выписки');
 });
 $('#sheet-ok').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, true); });
 $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, false); });
@@ -627,7 +665,9 @@ $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId;
     timer = setTimeout(() => {
       const [kind, id] = el.dataset.detail.split(':');
       cancel();
-      const d = kind === 'exp' ? expenseDetail(id) : Bank.detailOf(kind, id);
+      // обработанная операция показывается как её подтверждённый расход, чтобы её можно было править
+      const done = kind === 'proc' && expenses.find((x) => x[5] === Bank.keyOf(id));
+      const d = kind === 'exp' ? expenseDetail(id) : done ? expenseDetail(done[0]) : Bank.detailOf(kind, id);
       if (!d) return;
       try { tg && tg.HapticFeedback.impactOccurred('medium'); } catch (err) {}
       openSheet(d);
