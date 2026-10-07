@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <main id="app">
@@ -138,9 +138,14 @@
       <div class="card hidden" id="pending-card">
         <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3></div>
         <div id="pending-list" class="list"></div>
-        <div class="amount-row">
+        <div class="amount-row" id="pending-actions">
           <button class="btn" id="pend-all-ok">Подтвердить все</button>
           <button class="btn danger" id="pend-all-no">Отклонить все</button>
+        </div>
+        <div id="processed-box" class="hidden">
+          <div class="card-head processed-head"><h3>Уже обработаны (<span id="processed-count"></span>)</h3>
+            <button class="link" id="processed-hide">Скрыть</button></div>
+          <div id="processed-list" class="list"></div>
         </div>
       </div>
       <form id="expense-form" class="card form" autocomplete="off">
@@ -186,7 +191,7 @@
   </nav>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="banks.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -3,14 +3,14 @@
 /* ================= Выписки банков =================
  * Два обработчика: Revolut (PDF, CSV) и Wise (XLSX, CSV).
  * Найденные списания попадают в список ожидания. Подтверждённые записываются
- * в расходы по дате операции, отклонённые просто убираются из списка.
- * Ключи уже разобранных операций хранятся, чтобы повторная загрузка той же
- * выписки не возвращала их обратно.
+ * в расходы по дате операции вместе с ключом операции, отклонённые просто
+ * убираются из списка и при повторной загрузке появятся снова.
+ * Операция считается обработанной, пока в расходах есть запись с её ключом.
  */
 const Bank = (() => {
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-  let pending = []; // [id, date, amount, cur, note, bank, kind, key]
-  let seen = [];    // ключи подтверждённых и отклонённых операций
+  let pending = [];   // [id, date, amount, cur, note, bank, kind, key]
+  let processed = []; // уже записанные операции из последней загруженной выписки
 
   const KIND_LABELS = { card: 'Покупка', transfer: 'Перевод', fee: 'Комиссия', cash: 'Снятие наличных', other: 'Списание' };
   const pad = (n) => String(n).padStart(2, '0');
@@ -185,46 +185,46 @@ const Bank = (() => {
       ops = parseWise(rows) || parseRevolutTable(rows);
     }
     if (!ops) throw new Error('Файл не похож на выписку Revolut или Wise');
-    let added = 0; let skipped = 0;
+    const doneKeys = new Set(expenses.map((e) => e[5]).filter(Boolean));
+    let added = 0; let waiting = 0;
+    processed = [];
     ops.forEach((o) => {
-      const key = hash(o.key);
-      if (seen.includes(key) || pending.some((p) => p[7] === key)) { skipped++; return; }
-      pending.push([uid(), o.date, round2(o.amount), o.cur, o.note || 'Без описания', o.bank, o.kind, key]);
-      added++;
+      const rec = [uid(), o.date, round2(o.amount), o.cur, o.note || 'Без описания', o.bank, o.kind, hash(o.key)];
+      if (doneKeys.has(rec[7])) processed.push(rec);
+      else if (pending.some((p) => p[7] === rec[7])) waiting++;
+      else { pending.push(rec); added++; }
     });
     persist(false);
-    return { found: ops.length, added, skipped };
+    return { found: ops.length, added, waiting, processed: processed.length };
   }
 
   function persist(withExpenses) {
     Store.save('pend', pending);
-    Store.save('seen', seen);
     if (withExpenses) Store.save('exp', expenses);
   }
 
-  function confirmOne(p) {
-    expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`]);
-    seen.push(p[7]);
-  }
-
+  // Расход: [id, date, amount, cur, note, ключ банковской операции]
   function resolve(ids, accept) {
     const set = new Set(ids);
-    pending.filter((p) => set.has(p[0])).forEach((p) => (accept ? confirmOne(p) : seen.push(p[7])));
+    if (accept) {
+      pending.filter((p) => set.has(p[0]))
+        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7]]));
+    }
     pending = pending.filter((p) => !set.has(p[0]));
     persist(accept);
     haptic(accept ? 'success' : 'warning');
   }
 
   /* ---------- Отрисовка ---------- */
-  function pendingItem(p) {
-    return `<div class="pitem">
+  function pendingItem(p, done) {
+    return `<div class="pitem${done ? ' done' : ''}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
       <div class="a neg">−${fmt(p[2], p[3])}</div>
-      <div class="pbtns">
+      ${done ? '<span class="status">✓ Обработан</span>' : `<div class="pbtns">
         <button class="pb ok" data-ok="${esc(p[0])}" aria-label="Подтвердить">✓</button>
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
-      </div></div>`;
+      </div>`}</div>`;
   }
 
   function render() {
@@ -235,9 +235,16 @@ const Bank = (() => {
     banner.classList.toggle('hidden', !n);
     banner.querySelector('b').textContent = n;
     const card = document.getElementById('pending-card');
-    card.classList.toggle('hidden', !n);
+    card.classList.toggle('hidden', !n && !processed.length);
     document.getElementById('pending-count').textContent = n ? `(${n})` : '';
-    document.getElementById('pending-list').innerHTML = [...pending].sort(sortByDateDesc).map(pendingItem).join('');
+    document.getElementById('pending-list').innerHTML = n
+      ? [...pending].sort(sortByDateDesc).map((p) => pendingItem(p)).join('')
+      : '<div class="empty-state">Новых расходов нет</div>';
+    document.getElementById('pending-actions').classList.toggle('hidden', !n);
+    document.getElementById('processed-box').classList.toggle('hidden', !processed.length);
+    document.getElementById('processed-count').textContent = processed.length;
+    document.getElementById('processed-list').innerHTML = [...processed].sort(sortByDateDesc)
+      .map((p) => pendingItem(p, true)).join('');
   }
 
   function setup() {
@@ -248,10 +255,13 @@ const Bank = (() => {
       btn.classList.add('busy');
       try {
         const r = await importFile(file);
-        toast(r.added ? `Найдено расходов: ${r.added}. Подтвердите их ниже`
-          : r.found ? 'Все расходы из этой выписки уже обработаны' : 'Расходов в выписке не найдено');
+        const parts = [];
+        if (r.added) parts.push(`новых: ${r.added}`);
+        if (r.waiting) parts.push(`уже в ожидании: ${r.waiting}`);
+        if (r.processed) parts.push(`обработано ранее: ${r.processed}`);
+        toast(r.found ? 'Расходы в выписке — ' + parts.join(', ') : 'Расходов в выписке не найдено');
         window.render();
-        if (r.added) document.getElementById('pending-card').scrollIntoView({ behavior: 'smooth' });
+        if (r.found) document.getElementById('pending-card').scrollIntoView({ behavior: 'smooth' });
       } catch (err) {
         console.error(err);
         toast(err.message);
@@ -277,6 +287,7 @@ const Bank = (() => {
       toast('Список ожидания очищен');
       window.render();
     });
+    document.getElementById('processed-hide').addEventListener('click', () => { processed = []; window.render(); });
     document.getElementById('pending-banner').addEventListener('click', () => {
       show('more');
       document.getElementById('pending-card').scrollIntoView({ behavior: 'smooth' });
@@ -284,7 +295,7 @@ const Bank = (() => {
   }
 
   async function load() {
-    [pending, seen] = await Promise.all([Store.load('pend'), Store.load('seen')]);
+    pending = await Store.load('pend');
   }
 
   return { load, setup, render, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
