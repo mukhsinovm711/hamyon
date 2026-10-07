@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <main id="app">
@@ -22,6 +22,9 @@
           <div><span class="muted">Этот месяц</span><b id="month-total">—</b></div>
         </div>
       </div>
+      <button class="banner hidden" id="pending-banner">
+        <span>🧾 Ждут подтверждения расходов: <b>0</b></span><span>→</span>
+      </button>
       <div class="card">
         <div class="card-head">
           <h3>Доход по месяцам</h3>
@@ -124,6 +127,22 @@
     <!-- Ещё: расходы + данные -->
     <section class="view" id="view-more">
       <h2>Расходы</h2>
+      <div class="card">
+        <div class="card-head"><h3>Выписки банков</h3><span class="muted small">Revolut · Wise</span></div>
+        <label class="btn primary" id="statement-label">
+          <span class="when-idle">Загрузить выписку</span><span class="when-busy">Читаю выписку…</span>
+          <input type="file" id="file-statement" accept=".pdf,.xlsx,.xls,.csv" hidden>
+        </label>
+        <p class="muted small">Revolut — PDF или CSV, Wise — XLSX или CSV. Найденные списания попадут в список ожидания и запишутся в расходы только после вашего подтверждения.</p>
+      </div>
+      <div class="card hidden" id="pending-card">
+        <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3></div>
+        <div id="pending-list" class="list"></div>
+        <div class="amount-row">
+          <button class="btn" id="pend-all-ok">Подтвердить все</button>
+          <button class="btn danger" id="pend-all-no">Отклонить все</button>
+        </div>
+      </div>
       <form id="expense-form" class="card form" autocomplete="off">
         <div class="amount-row">
           <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input" placeholder="Сумма" required>
@@ -163,10 +182,11 @@
     <button data-view="history"><span>☰</span>История</button>
     <button data-view="add" class="add"><span>＋</span></button>
     <button data-view="reports"><span>▤</span>Отчёты</button>
-    <button data-view="more"><span>⋯</span>Ещё</button>
+    <button data-view="more"><span>⋯</span>Ещё<i class="badge hidden" id="tab-badge"></i></button>
   </nav>
 
   <div id="toast" class="toast"></div>
-  <script src="app.js?v=3"></script>
+  <script src="banks.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

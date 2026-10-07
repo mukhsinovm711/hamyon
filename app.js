@@ -648,6 +648,7 @@ $('#btn-clear').addEventListener('click', async () => {
 /* ================= Запуск ================= */
 function render() {
   ({ home: renderHome, history: renderHistory, reports: renderReports, more: renderMore, add: () => {} })[currentView]();
+  Bank.render();
 }
 
 (async function init() {
@@ -656,7 +657,8 @@ function render() {
     $('#app').innerHTML = '<div class="empty-state" style="padding-top:35vh">🔒 Нет доступа</div>';
     return;
   }
-  [incomes, expenses] = await Promise.all([Store.load('inc'), Store.load('exp')]);
+  [incomes, expenses] = await Promise.all([Store.load('inc'), Store.load('exp'), Bank.load()]);
+  Bank.setup();
   resetForm();
   render();
 })();

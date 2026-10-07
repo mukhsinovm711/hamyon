@@ -165,3 +165,38 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
   opacity: 0; pointer-events: none; transition: .2s; z-index: 20; max-width: calc(100% - 32px); text-align: center;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Выписки банков */
+.banner {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--soft); color: var(--accent); border: 0; border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 12px; font: inherit; text-align: left; cursor: pointer;
+}
+#statement-label .when-busy { display: none; }
+#statement-label.busy { opacity: .7; pointer-events: none; }
+#statement-label.busy .when-idle { display: none; }
+#statement-label.busy .when-busy { display: inline; }
+#pending-card .amount-row { margin-top: 10px; }
+
+.pitem { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pitem:last-child { border-bottom: 0; }
+.pitem .pmain { flex: 1; min-width: 0; }
+.pitem .t { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pitem .s { font-size: 12px; color: var(--hint); }
+.pitem .a { font-weight: 600; white-space: nowrap; color: var(--danger); }
+.pbtns { display: flex; gap: 6px; }
+.pb { width: 34px; height: 34px; border-radius: 50%; border: 0; font-size: 16px; font-weight: 700; cursor: pointer; }
+.pb.ok { background: color-mix(in srgb, #2eb85c 18%, transparent); color: #2eb85c; }
+.pb.no { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.pb:active { transform: scale(.92); }
+
+.tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; }
+.tag.revolut { background: color-mix(in srgb, #7b61ff 18%, transparent); color: #7b61ff; }
+.tag.wise { background: color-mix(in srgb, #2eb85c 18%, transparent); color: #2eb85c; }
+
+.tabbar button { position: relative; }
+.badge {
+  position: absolute; top: 0; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; background: var(--danger); color: #fff; font-size: 10px; font-style: normal; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
