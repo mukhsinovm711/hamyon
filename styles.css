@@ -220,3 +220,35 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 .chips .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
 #struct-years { margin-bottom: 8px; }
 .card .chips button:not(.on) { background: var(--bg); }
+
+/* Удержание строки и окно подробностей */
+.pressable {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  background: linear-gradient(var(--soft), var(--soft)) no-repeat left / 0% 100%;
+  border-radius: 8px;
+}
+.pressable.pressing { background-size: 100% 100%; transition: background-size 3s linear; }
+
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0);
+  display: flex; align-items: flex-end; justify-content: center; transition: background .2s;
+}
+.sheet-backdrop.open { background: rgba(0, 0, 0, .45); }
+.sheet {
+  width: 100%; max-width: 640px; max-height: 85vh; overflow-y: auto;
+  background: var(--card); border-radius: 18px 18px 0 0;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .2s ease;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sheet-backdrop.open .sheet { transform: none; }
+.sheet-grip { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 6px; }
+.sheet-title { font-size: 17px; font-weight: 600; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.sheet-amount { font-size: 26px; font-weight: 700; color: var(--danger); }
+.sheet-fields {
+  display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 4px 0;
+  padding: 12px; background: var(--bg); border-radius: 12px;
+}
+.sheet-fields dt { color: var(--hint); font-size: 13px; }
+.sheet-fields dd { margin: 0; font-size: 14px; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.btn.ok { background: color-mix(in srgb, #2eb85c 16%, transparent); color: #2eb85c; }

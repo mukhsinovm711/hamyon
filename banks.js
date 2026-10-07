@@ -97,9 +97,10 @@ const Bank = (() => {
         let cat = mid.filter((c) => !descCol(c)).map((c) => c.s).join(' ');
         if (catX == null && desc.length > 1) cat = desc.pop();
         const m = cells[mi].s.match(MONEY);
+        const after = cells.slice(mi + 1).map((c) => c.s);
         last = {
           date, desc: desc.join(' '), cat, neg: m[1] === '-', amount: num(m[2]), cur: SIGN[m[3]],
-          bal: cells[mi + 1] ? cells[mi + 1].s : '',
+          bal: after[0] || '', fees: after[3] || '',
         };
         lastRow = row;
         ops.push(last);
@@ -112,7 +113,9 @@ const Bank = (() => {
     }
     return ops.filter((o) => o.neg && RV_KINDS[o.cat] !== 'exchange').map((o) => ({
       date: o.date, amount: o.amount, cur: o.cur, note: o.desc, bank: 'Revolut',
-      kind: RV_KINDS[o.cat] || 'other', key: `rv|${o.date}|${o.desc}|${o.amount}|${o.cur}|${o.bal}`,
+      kind: RV_KINDS[o.cat] || (/^Перевод/i.test(o.desc) ? 'transfer' : 'other'),
+      key: `rv|${o.date}|${o.desc}|${o.amount}|${o.cur}|${o.bal}`,
+      details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', /^0,00/.test(o.fees) ? '' : o.fees]],
     }));
   }
 
@@ -136,6 +139,8 @@ const Bank = (() => {
         date, amount: round2(-amount + fee), cur: String(r[ix('currency')] || 'EUR').toUpperCase(), note: desc,
         bank: 'Revolut', kind: kinds[type] || 'other',
         key: `rvc|${r[ix('started date')]}|${desc}|${amount}|${r[ix('balance')]}`,
+        details: [['Тип операции', type], ['Счёт', r[ix('product')]], ['Начата', r[ix('started date')]],
+          ['Завершена', r[ix('completed date')]], ['Комиссия', fee ? fee : ''], ['Баланс после', r[ix('balance')]]],
       });
     });
     return ops;
@@ -146,7 +151,16 @@ const Bank = (() => {
     id: ['удостоверение личности', 'transferwise id', 'id'], date: ['дата', 'date'], amount: ['сумма', 'amount'],
     cur: ['валюта', 'currency'], desc: ['описание', 'description'], payee: ['имя получателя', 'payee name'],
     merchant: ['поставщик услуг', 'merchant'], det: ['тип деталей транзакции', 'transaction details type'],
+    datetime: ['дата и время', 'date time'], ref: ['пояснение к переводу', 'payment reference'],
+    account: ['номер счета получателя', 'payee account number'], card: ['последние 4 цифры карты', 'card last four digits'],
+    fee: ['итоговая комиссия', 'total fees'], balance: ['текущий баланс', 'running balance'], memo: ['примечание', 'note'],
   };
+
+  function wiseTime(v) {
+    if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); return d ? `${pad(d.H)}:${pad(d.M)}` : ''; }
+    const m = String(v ?? '').match(/(\d{1,2}):(\d{2})/);
+    return m ? `${pad(m[1])}:${m[2]}` : '';
+  }
 
   function parseWise(rows) {
     const h = (rows[0] || []).map(norm);
@@ -167,6 +181,10 @@ const Bank = (() => {
       ops.push({
         date, amount: round2(-amount), cur: (str(r, C.cur) || 'EUR').toUpperCase(), note, bank: 'Wise', kind,
         key: `wise|${str(r, C.id) || date + str(r, C.desc) + amount}`,
+        details: [['ID операции', str(r, C.id)], ['Время', wiseTime(r[C.datetime])], ['Получатель', str(r, C.payee)],
+          ['Счёт получателя', str(r, C.account)], ['Магазин', str(r, C.merchant)], ['Пояснение', str(r, C.ref)],
+          ['Карта', str(r, C.card) ? '•••• ' + str(r, C.card) : ''], ['Комиссия', num(r[C.fee]) ? String(num(r[C.fee])) : ''],
+          ['Баланс после', str(r, C.balance)], ['Тип в Wise', det], ['Примечание', str(r, C.memo)]],
       });
     });
     return ops;
@@ -185,16 +203,20 @@ const Bank = (() => {
       ops = parseWise(rows) || parseRevolutTable(rows);
     }
     if (!ops) throw new Error('Файл не похож на выписку Revolut или Wise');
-    const doneKeys = new Set(expenses.map((e) => e[5]).filter(Boolean));
-    let added = 0; let waiting = 0;
+    let added = 0; let waiting = 0; let backfilled = false;
     processed = [];
     ops.forEach((o) => {
-      const rec = [uid(), o.date, round2(o.amount), o.cur, o.note || 'Без описания', o.bank, o.kind, hash(o.key)];
-      if (doneKeys.has(rec[7])) processed.push(rec);
-      else if (pending.some((p) => p[7] === rec[7])) waiting++;
+      const details = [['Описание', o.note], ...(o.details || []), ['Файл', file.name]]
+        .filter(([, v]) => v !== '' && v != null).map(([k, v]) => [k, String(v)]);
+      const rec = [uid(), o.date, round2(o.amount), o.cur, o.note || 'Без описания', o.bank, o.kind, hash(o.key), details];
+      // записям, загруженным до появления подробностей, дописываем их
+      const old = pending.find((p) => p[7] === rec[7]);
+      const done = expenses.find((e) => e[5] === rec[7]);
+      if (done) { if (!done[6] || !done[6].length) { done[6] = details; backfilled = true; } processed.push(rec); }
+      else if (old) { if (!old[8]) old[8] = details; waiting++; }
       else { pending.push(rec); added++; }
     });
-    persist(false);
+    persist(backfilled);
     return { found: ops.length, added, waiting, processed: processed.length };
   }
 
@@ -203,12 +225,12 @@ const Bank = (() => {
     if (withExpenses) Store.save('exp', expenses);
   }
 
-  // Расход: [id, date, amount, cur, note, ключ банковской операции]
+  // Расход: [id, date, amount, cur, note, ключ банковской операции, детали из выписки]
   function resolve(ids, accept) {
     const set = new Set(ids);
     if (accept) {
       pending.filter((p) => set.has(p[0]))
-        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7]]));
+        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || []]));
     }
     pending = pending.filter((p) => !set.has(p[0]));
     persist(accept);
@@ -217,7 +239,7 @@ const Bank = (() => {
 
   /* ---------- Отрисовка ---------- */
   function pendingItem(p, done) {
-    return `<div class="pitem${done ? ' done' : ''}">
+    return `<div class="pitem pressable${done ? ' done' : ''}" data-detail="${done ? 'proc' : 'pend'}:${esc(p[0])}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
       <div class="a neg">−${fmt(p[2], p[3])}</div>
@@ -298,5 +320,24 @@ const Bank = (() => {
     pending = await Store.load('pend');
   }
 
-  return { load, setup, render, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  // Данные для окна подробностей: { title, amount, cur, fields, pending }
+  function detailOf(kind, id) {
+    const p = (kind === 'pend' ? pending : processed).find((x) => x[0] === id);
+    if (!p) return null;
+    return {
+      title: p[4], amount: -p[2], cur: p[3], pendingId: kind === 'pend' ? p[0] : null,
+      fields: [['Дата', fmtDate(p[1])], ['Банк', p[5]], ['Вид', KIND_LABELS[p[6]] || ''],
+        ['Статус', kind === 'pend' ? 'Ожидает подтверждения' : '✓ Обработан'],
+        ...(p[8] || [['Описание', p[4]]])],
+    };
+  }
+
+  function decide(id, accept) {
+    const p = pending.find((x) => x[0] === id); if (!p) return;
+    resolve([id], accept);
+    toast(accept ? `Записано в расходы: ${fmtDate(p[1])}` : 'Отклонено');
+    window.render();
+  }
+
+  return { load, setup, render, detailOf, decide, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

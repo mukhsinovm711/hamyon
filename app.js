@@ -528,7 +528,7 @@ function renderMore() {
     const g = groups[k];
     return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}</span><span>${fmt(sum(g))}</span></div>`
       + g.map((r) => { const x = exp(r);
-        return `<div class="item"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
+        return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
           <div style="display:flex;align-items:center;gap:6px"><div class="a neg">−${fmt(x.amount, x.cur)}</div><button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || '<div class="empty-state">Расходов за этот год нет</div>';
@@ -559,6 +559,84 @@ $('#expense-list').addEventListener('click', async (e) => {
   Store.save('exp', expenses);
   renderMore();
 });
+
+/* ================= Подробности операции =================
+ * Удержание строки 3 секунды открывает окно со всеми данными и копированием.
+ */
+const HOLD_MS = 3000;
+let sheetData = null;
+
+function expenseDetail(id) {
+  const r = expenses.find((x) => x[0] === id);
+  if (!r) return null;
+  const x = exp(r);
+  return {
+    title: x.note || 'Расход', amount: -x.amount, cur: x.cur, pendingId: null,
+    fields: [['Дата', fmtDate(x.date)], ['Статус', r[5] ? 'Подтверждён из выписки' : 'Добавлен вручную'],
+      ...(r[6] && r[6].length ? r[6] : [['Комментарий', x.note || '']])],
+  };
+}
+
+function openSheet(d) {
+  sheetData = d;
+  $('#sheet-title').textContent = d.title;
+  $('#sheet-amount').textContent = (d.amount < 0 ? '−' : '') + fmt(Math.abs(d.amount), d.cur);
+  $('#sheet-fields').innerHTML = d.fields.filter(([, v]) => v).map(([k, v]) =>
+    `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('#sheet-decide').classList.toggle('hidden', !d.pendingId);
+  $('#sheet').classList.remove('hidden');
+  requestAnimationFrame(() => $('#sheet').classList.add('open'));
+}
+
+function closeSheet() {
+  sheetData = null;
+  $('#sheet').classList.remove('open');
+  setTimeout(() => $('#sheet').classList.add('hidden'), 200);
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return; } catch (e) { /* в WebView Telegram может не работать */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+}
+
+$('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
+$('#sheet-close').addEventListener('click', closeSheet);
+$('#sheet-copy').addEventListener('click', async () => {
+  if (!sheetData) return;
+  const d = sheetData;
+  const text = [d.title, $('#sheet-amount').textContent, ...d.fields.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`)].join('\n');
+  await copyText(text);
+  haptic();
+  toast('Скопировано');
+});
+$('#sheet-ok').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, true); });
+$('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, false); });
+
+// Удержание: строка заполняется подсветкой, через 3 секунды открывается окно
+(function setupLongPress() {
+  let timer = null; let el = null; let sx = 0; let sy = 0;
+  const cancel = () => { clearTimeout(timer); if (el) el.classList.remove('pressing'); el = null; };
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target.closest('.pressable[data-detail]');
+    if (!t || e.target.closest('button')) return;
+    cancel();
+    el = t; sx = e.clientX; sy = e.clientY;
+    t.classList.add('pressing');
+    timer = setTimeout(() => {
+      const [kind, id] = el.dataset.detail.split(':');
+      cancel();
+      const d = kind === 'exp' ? expenseDetail(id) : Bank.detailOf(kind, id);
+      if (!d) return;
+      try { tg && tg.HapticFeedback.impactOccurred('medium'); } catch (err) {}
+      openSheet(d);
+    }, HOLD_MS);
+  });
+  document.addEventListener('pointermove', (e) => { if (el && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
+  ['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, cancel));
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest('.pressable')) e.preventDefault(); });
+})();
 
 /* ================= Импорт / экспорт ================= */
 const recKey = (r) => [r[1], r[2], r[3], r[4] ?? '', r[5] ?? '', r[6] ?? ''].join('|');
