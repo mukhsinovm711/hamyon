@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Hamyon</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app">
+    <!-- Обзор -->
+    <section class="view active" id="view-home">
+      <div class="hero">
+        <div class="hero-label">Всего за всё время</div>
+        <div class="hero-value" id="grand-total">—</div>
+        <div class="hero-row">
+          <div><span class="muted">Этот год</span><b id="year-total">—</b></div>
+          <div><span class="muted">Среднее / мес</span><b id="year-avg">—</b></div>
+          <div><span class="muted">Этот месяц</span><b id="month-total">—</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>Доход по месяцам</h3>
+          <div class="seg" id="chart-range">
+            <button data-range="12" class="on">12 мес</button>
+            <button data-range="all">Всё</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="chart-monthly"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Последние записи</h3></div>
+        <div id="recent" class="list"></div>
+      </div>
+    </section>
+
+    <!-- История -->
+    <section class="view" id="view-history">
+      <h2>История</h2>
+      <div class="chips" id="history-years"></div>
+      <input type="search" id="history-search" class="input" placeholder="Поиск по типу, источнику…">
+      <div id="history-list"></div>
+    </section>
+
+    <!-- Добавить / редактировать -->
+    <section class="view" id="view-add">
+      <h2 id="form-title">Новый доход</h2>
+      <form id="income-form" class="form" autocomplete="off">
+        <label>Сумма
+          <div class="amount-row">
+            <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input big" placeholder="0" required>
+            <input type="text" name="cur" class="input cur" maxlength="3" value="EUR" required>
+          </div>
+        </label>
+        <label>Дата
+          <input type="date" name="date" class="input" required>
+        </label>
+        <label>Тип дохода
+          <select name="type" class="input" data-other="type"></select>
+          <input type="text" name="type_other" class="input other hidden" placeholder="Свой тип">
+        </label>
+        <label>Форма
+          <div class="seg wide" id="form-seg"></div>
+        </label>
+        <label>Источник (работодатель)
+          <select name="source" class="input" data-other="source"></select>
+          <input type="text" name="source_other" class="input other hidden" placeholder="Свой источник">
+        </label>
+        <button type="submit" class="btn primary">Сохранить</button>
+        <button type="button" class="btn danger hidden" id="btn-delete">Удалить</button>
+        <button type="button" class="btn ghost hidden" id="btn-cancel">Отмена</button>
+      </form>
+    </section>
+
+    <!-- Отчёты -->
+    <section class="view" id="view-reports">
+      <h2>Отчёты</h2>
+
+      <div class="card">
+        <div class="card-head"><h3>По годам</h3></div>
+        <table class="tbl" id="years-table"></table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Календарь месяца</h3>
+          <div class="pick">
+            <select id="cal-month" class="input sm"></select>
+            <select id="cal-year" class="input sm"></select>
+          </div>
+        </div>
+        <div class="cal-total" id="cal-total"></div>
+        <div class="cal" id="calendar"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Доход за период</h3></div>
+        <div class="period">
+          <input type="date" id="period-from" class="input">
+          <span class="muted">—</span>
+          <input type="date" id="period-to" class="input">
+        </div>
+        <div class="stats" id="period-result"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Структура</h3>
+          <select id="struct-year" class="input sm"></select>
+        </div>
+        <div class="seg wide" id="struct-by">
+          <button data-by="type" class="on">Тип</button>
+          <button data-by="source">Источник</button>
+          <button data-by="form">Форма</button>
+        </div>
+        <div id="struct-bars" class="bars"></div>
+      </div>
+    </section>
+
+    <!-- Ещё: расходы + данные -->
+    <section class="view" id="view-more">
+      <h2>Расходы</h2>
+      <form id="expense-form" class="card form" autocomplete="off">
+        <div class="amount-row">
+          <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input" placeholder="Сумма" required>
+          <input type="date" name="date" class="input" required>
+        </div>
+        <input type="text" name="note" class="input" placeholder="Комментарий (необязательно)">
+        <button type="submit" class="btn primary">Добавить расход</button>
+      </form>
+      <div class="card">
+        <div class="card-head"><h3>Расходы по месяцам</h3><select id="exp-year" class="input sm"></select></div>
+        <div id="expense-list" class="list"></div>
+      </div>
+
+      <h2>Данные</h2>
+      <div class="card actions">
+        <label class="btn">
+          Импорт из Excel (.xlsx)
+          <input type="file" id="file-xlsx" accept=".xlsx,.xls" hidden>
+        </label>
+        <button class="btn" id="btn-export">Экспорт (резервная копия JSON)</button>
+        <button class="btn" id="btn-import-json">Восстановить из JSON</button>
+        <button class="btn danger" id="btn-clear">Удалить все данные</button>
+        <p class="muted small" id="storage-info"></p>
+      </div>
+      <div class="card hidden" id="json-box">
+        <textarea id="json-text" class="input" rows="8"></textarea>
+        <div class="amount-row">
+          <button class="btn primary" id="json-action">Готово</button>
+          <button class="btn ghost" id="json-close">Закрыть</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button data-view="home" class="on"><span>◉</span>Обзор</button>
+    <button data-view="history"><span>☰</span>История</button>
+    <button data-view="add" class="add"><span>＋</span></button>
+    <button data-view="reports"><span>▤</span>Отчёты</button>
+    <button data-view="more"><span>⋯</span>Ещё</button>
+  </nav>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
