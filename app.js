@@ -408,7 +408,6 @@ function renderReports() {
   }
   const yList = ys.includes(year(now)) ? ys : [...ys, year(now)];
   yearOptions($('#cal-year'), yList, $('#cal-year').value || year(now));
-  yearOptions($('#struct-year'), yList, $('#struct-year').value || year(now));
   renderCalendar();
   renderPeriod();
   renderStruct();
@@ -460,21 +459,52 @@ function renderPeriod() {
 }
 ['#period-from', '#period-to'].forEach((s) => $(s).addEventListener('change', renderPeriod));
 
+// Можно выбрать несколько лет: суммы складываются, полоса делится по годам
+const YEAR_COLORS = ['#2481cc', '#2eb85c', '#f5a623', '#7b61ff', '#e5484d', '#00a3a3', '#d6409f', '#8d8d8d'];
+let structYears = null;
+
 function renderStruct() {
-  const y = +$('#struct-year').value;
+  const all = years();
+  if (!structYears) structYears = new Set([all.includes(year(today())) ? year(today()) : all[all.length - 1]]);
+  const color = (y) => YEAR_COLORS[all.indexOf(y) % YEAR_COLORS.length];
+  const allOn = all.length > 1 && all.every((y) => structYears.has(y));
+  $('#struct-years').innerHTML = (all.length > 1 ? `<button data-y="all" class="${allOn ? 'on' : ''}">Все</button>` : '')
+    + all.map((y) => `<button data-y="${y}" class="${structYears.has(y) ? 'on' : ''}">${structYears.size > 1 && structYears.has(y)
+      ? `<i class="dot" style="background:${color(y)}"></i>` : ''}${y}</button>`).join('');
+
+  const sel = all.filter((y) => structYears.has(y));
+  const multi = sel.length > 1;
   const idx = { type: 4, source: 6, form: 5 }[structBy];
   const labels = { type: TYPE_LABELS, source: SOURCE_LABELS, form: FORM_LABELS }[structBy];
   const agg = {};
-  mainIncomes().filter((r) => year(r[1]) === y).forEach((r) => { agg[r[idx]] = (agg[r[idx]] || 0) + r[2]; });
-  const entries = Object.entries(agg).sort((a, b) => b[1] - a[1]);
-  const total = entries.reduce((s, e) => s + e[1], 0);
+  mainIncomes().filter((r) => structYears.has(year(r[1]))).forEach((r) => {
+    const a = agg[r[idx]] = agg[r[idx]] || { total: 0, by: {} };
+    a.total += r[2];
+    a.by[year(r[1])] = (a.by[year(r[1])] || 0) + r[2];
+  });
+  const entries = Object.entries(agg).sort((a, b) => b[1].total - a[1].total);
+  const total = entries.reduce((s, e) => s + e[1].total, 0);
+  const max = entries.length ? entries[0][1].total : 1;
   $('#struct-bars').innerHTML = entries.map(([k, v]) => `
     <div class="bar"><div class="bar-top"><span>${esc(label(labels, k))}</span>
-      <span>${fmt(Math.round(v * 100) / 100)} <span class="muted">· ${Math.round((v / total) * 100)}%</span></span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(v / entries[0][1]) * 100}%"></div></div></div>`).join('')
-    || '<div class="empty-state">Нет данных за этот год</div>';
+      <span>${fmt(Math.round(v.total * 100) / 100)} <span class="muted">· ${Math.round((v.total / total) * 100)}%</span></span></div>
+      <div class="bar-track">${multi
+        ? `<div class="bar-stack" style="width:${(v.total / max) * 100}%">${sel.filter((y) => v.by[y]).map((y) =>
+          `<div style="flex:${v.by[y]};background:${color(y)}" title="${y}: ${fmt(Math.round(v.by[y] * 100) / 100)}"></div>`).join('')}</div>`
+        : `<div class="bar-fill" style="width:${(v.total / max) * 100}%"></div>`}</div></div>`).join('')
+    || `<div class="empty-state">Нет данных за ${multi ? 'выбранные годы' : 'этот год'}</div>`;
 }
-$('#struct-year').addEventListener('change', renderStruct);
+$('#struct-years').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const all = years();
+  if (b.dataset.y === 'all') {
+    structYears = all.every((y) => structYears.has(y)) ? new Set([all[all.length - 1]]) : new Set(all);
+  } else {
+    const y = +b.dataset.y;
+    if (structYears.has(y)) { if (structYears.size > 1) structYears.delete(y); } else structYears.add(y);
+  }
+  renderStruct();
+});
 document.querySelectorAll('#struct-by button').forEach((b) => b.addEventListener('click', () => {
   structBy = b.dataset.by;
   document.querySelectorAll('#struct-by button').forEach((x) => x.classList.toggle('on', x === b));
