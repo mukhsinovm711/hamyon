@@ -505,7 +505,7 @@ function renderMore() {
 
   const cloudInfo = cloud ? 'Данные хранятся в облаке Telegram и доступны на всех ваших устройствах.'
     : 'Открыто вне Telegram — данные хранятся локально в браузере.';
-  $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}.`;
+  $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;
 }
 $('#exp-year').addEventListener('change', renderMore);
 
