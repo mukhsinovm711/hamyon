@@ -38,6 +38,13 @@ const Debts = (() => {
         : `<button class="pb ok" data-close="${esc(d[0])}" aria-label="Долг возвращён">✓</button>`}</div></div>`;
   }
 
+  // Подтверждённый расход → «я дал в долг». Ключ, подробности и исходная сумма сохраняются,
+  // поэтому при повторной загрузке выписки операция покажется как «В долгах»
+  function fromExpense(r) {
+    const [person, bank] = r[5] && / · /.test(r[4]) ? [r[4].slice(0, r[4].lastIndexOf(' · ')), r[4].slice(r[4].lastIndexOf(' · ') + 3)] : [r[4], ''];
+    add([uid(), r[1], r[2], r[3], person || 'Без имени', bank, 'lent', null, r[5] || null, r[6] || null, r[7] ?? null]);
+  }
+
   function render() {
     const open = debts.filter((d) => !d[7]).sort(sortByDateDesc);
     const closed = debts.filter((d) => d[7]).sort((a, b) => (a[7] < b[7] ? 1 : -1));
@@ -112,5 +119,5 @@ const Debts = (() => {
 
   async function load() { debts = await Store.load('debt'); }
 
-  return { load, setup, render, detail, fromPending, hasKey, byKey, get all() { return debts; } };
+  return { load, setup, render, detail, fromPending, fromExpense, hasKey, byKey, get all() { return debts; } };
 })();

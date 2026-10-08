@@ -661,16 +661,23 @@ function renderMore() {
   if (!ys.includes(now)) ys.push(now);
   yearOptions($('#exp-year'), ys, $('#exp-year').value || now);
   const y = +$('#exp-year').value;
-  // С поиском — по всем годам и без ограничения ленты
+  if (!$('#exp-month').options.length) {
+    $('#exp-month').innerHTML = '<option value="">Все месяцы</option>'
+      + MONTHS_RU.map((m, i) => `<option value="${String(i + 1).padStart(2, '0')}">${m}</option>`).join('');
+  }
+  const m = $('#exp-month').value;
+  // С поиском — по всем годам и без ограничения ленты; с выбранным месяцем — весь месяц
   const q = $('#exp-search').value.trim().toLowerCase();
-  const rows = (q ? expenses.filter((r) => expenseMatches(r, q)) : expenses.filter((r) => year(r[1]) === y)).sort(sortByDateDesc);
-  const shown = expShowAll || q ? rows : rows.slice(0, EXP_FEED);
+  const rows = (q ? expenses.filter((r) => expenseMatches(r, q))
+    : expenses.filter((r) => year(r[1]) === y && (!m || r[1].slice(5, 7) === m))).sort(sortByDateDesc);
+  const shown = expShowAll || q || m ? rows : rows.slice(0, EXP_FEED);
   const monthTotal = (k) => sumByCur(rows.filter((r) => ym(r[1]) === k));
   const groups = {};
   shown.forEach((r) => (groups[ym(r[1])] = groups[ym(r[1])] || []).push(r));
-  $('#exp-more').classList.toggle('hidden', !!q || rows.length <= EXP_FEED);
+  $('#exp-more').classList.toggle('hidden', !!q || !!m || rows.length <= EXP_FEED);
   $('#exp-more').textContent = expShowAll ? 'Свернуть' : `Показать все (${rows.length})`;
   $('#exp-year').disabled = !!q;
+  $('#exp-month').disabled = !!q;
   $('#exp-found').classList.toggle('hidden', !q);
   $('#exp-found').textContent = `Найдено: ${rows.length} на ${sumByCur(rows)}`;
   $('#expense-list').innerHTML = Object.keys(groups).map((k) => {
@@ -680,12 +687,12 @@ function renderMore() {
         return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
-  }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : 'Расходов за этот год нет'}</div>`;
+  }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : m ? 'Расходов за этот месяц нет' : 'Расходов за этот год нет'}</div>`;
 
   const cloudInfo = Store.summary();
   $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;
 }
-$('#exp-year').addEventListener('change', () => { expShowAll = false; renderMore(); });
+['#exp-year', '#exp-month'].forEach((s) => $(s).addEventListener('change', () => { expShowAll = false; renderMore(); }));
 
 expForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -768,6 +775,7 @@ function openSheet(d) {
     `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   $('#sheet-decide').classList.toggle('hidden', !d.pendingId);
   $('#sheet-debt').classList.toggle('hidden', !d.pendingId);
+  $('#sheet-to-debt').classList.toggle('hidden', !(d.ref && d.ref.type === 'exp'));
   $('#sheet').classList.remove('hidden');
   requestAnimationFrame(() => $('#sheet').classList.add('open'));
 }
@@ -815,6 +823,17 @@ $('#sheet-restore').addEventListener('click', () => {
 $('#sheet-ok').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, true); });
 $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, false); });
 $('#sheet-debt').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.toDebt(id); });
+$('#sheet-to-debt').addEventListener('click', async () => {
+  const r = expenses.find((x) => x[0] === sheetData.ref.id); if (!r) return;
+  if (!(await confirmBox(`Перенести «${r[4] || 'Расход'}» (${fmt(r[2], r[3])}) из расходов в долги «Мне должны»?`))) return;
+  closeSheet();
+  Debts.fromExpense(r);
+  expenses = expenses.filter((x) => x !== r);
+  Store.save('exp', expenses);
+  haptic();
+  toast('Перенесено в долги');
+  render();
+});
 
 // Удержание: строка заполняется подсветкой, через 1,5 секунды открывается окно
 (function setupLongPress() {

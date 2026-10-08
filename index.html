@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <main id="app">
@@ -210,7 +210,9 @@
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>Расходы по месяцам</h3><select id="exp-year" class="input sm"></select></div>
+        <div class="card-head"><h3>Расходы по месяцам</h3>
+          <div class="pick"><select id="exp-month" class="input sm"></select><select id="exp-year" class="input sm"></select></div>
+        </div>
         <input type="search" id="exp-search" class="input" placeholder="Поиск по расходам…">
         <div class="muted small hidden" id="exp-found"></div>
         <div id="expense-list" class="list"></div>
@@ -269,6 +271,7 @@
         <button class="btn danger" id="sheet-no">✕ Отклонить</button>
       </div>
       <button class="btn hidden" id="sheet-debt">🤝 Записать как долг</button>
+      <button class="btn hidden" id="sheet-to-debt">🤝 Перенести в долги</button>
       <div class="amount-row">
         <button class="btn ghost" id="sheet-close">Закрыть</button>
       </div>
@@ -276,8 +279,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=19"></script>
-  <script src="debts.js?v=19"></script>
-  <script src="app.js?v=19"></script>
+  <script src="banks.js?v=20"></script>
+  <script src="debts.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
