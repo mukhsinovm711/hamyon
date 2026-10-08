@@ -603,6 +603,14 @@ const EXP_FEED = 5;
 let expShowAll = false;
 $('#exp-more').addEventListener('click', () => { expShowAll = !expShowAll; renderMore(); });
 
+// Поиск по комментарию, сумме (исходной и изменённой), дате и подробностям из выписки
+function expenseMatches(r, q) {
+  const money = (n) => (n == null ? '' : `${n} ${String(n).replace('.', ',')}`);
+  const details = (r[6] || []).map(([, v]) => v).join(' ');
+  return [r[4], money(r[2]), money(r[7]), fmtDate(r[1]), r[1], details].join(' ').toLowerCase().includes(q);
+}
+$('#exp-search').addEventListener('input', renderMore);
+
 function renderMore() {
   if (!expForm.elements.date.value) expForm.elements.date.value = today();
   const ys = [...new Set(expenses.map((r) => year(r[1])))].sort((a, b) => a - b);
@@ -610,21 +618,26 @@ function renderMore() {
   if (!ys.includes(now)) ys.push(now);
   yearOptions($('#exp-year'), ys, $('#exp-year').value || now);
   const y = +$('#exp-year').value;
-  const rows = expenses.filter((r) => year(r[1]) === y).sort(sortByDateDesc);
-  const shown = expShowAll ? rows : rows.slice(0, EXP_FEED);
+  // С поиском — по всем годам и без ограничения ленты
+  const q = $('#exp-search').value.trim().toLowerCase();
+  const rows = (q ? expenses.filter((r) => expenseMatches(r, q)) : expenses.filter((r) => year(r[1]) === y)).sort(sortByDateDesc);
+  const shown = expShowAll || q ? rows : rows.slice(0, EXP_FEED);
   const monthTotal = (k) => sum(rows.filter((r) => ym(r[1]) === k));
   const groups = {};
   shown.forEach((r) => (groups[ym(r[1])] = groups[ym(r[1])] || []).push(r));
-  $('#exp-more').classList.toggle('hidden', rows.length <= EXP_FEED);
+  $('#exp-more').classList.toggle('hidden', !!q || rows.length <= EXP_FEED);
   $('#exp-more').textContent = expShowAll ? 'Свернуть' : `Показать все (${rows.length})`;
+  $('#exp-year').disabled = !!q;
+  $('#exp-found').classList.toggle('hidden', !q);
+  $('#exp-found').textContent = `Найдено: ${rows.length} на ${fmt(sum(rows))}`;
   $('#expense-list').innerHTML = Object.keys(groups).map((k) => {
     const g = groups[k];
-    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}</span><span>${fmt(monthTotal(k))}</span></div>`
+    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${fmt(monthTotal(k))}</span></div>`
       + g.map((r) => { const x = exp(r);
         return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
-  }).join('') || '<div class="empty-state">Расходов за этот год нет</div>';
+  }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : 'Расходов за этот год нет'}</div>`;
 
   const cloudInfo = Store.summary();
   $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;

@@ -289,3 +289,6 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 
 #download-box .period { margin: 4px 0 12px; }
 #download-box .chips { margin-bottom: 4px; }
+
+#exp-search { margin-bottom: 8px; }
+#exp-found { margin-bottom: 4px; }
