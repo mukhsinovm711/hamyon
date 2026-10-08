@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
   <main id="app">
@@ -43,7 +43,10 @@
 
     <!-- История -->
     <section class="view" id="view-history">
-      <h2>История</h2>
+      <div class="title-row">
+        <h2>История</h2>
+        <button class="icon-btn" id="btn-download" aria-label="Скачать поступления в Excel" title="Скачать поступления в Excel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button>
+      </div>
       <div class="chips" id="history-years"></div>
       <input type="search" id="history-search" class="input" placeholder="Поиск по типу, источнику…">
       <div id="history-list"></div>
@@ -66,9 +69,9 @@
           <select name="type" class="input" data-other="type"></select>
           <input type="text" name="type_other" class="input other hidden" placeholder="Свой тип">
         </label>
-        <label>Форма
+        <div class="field">Форма
           <div class="seg wide" id="form-seg"></div>
-        </label>
+        </div>
         <label>Источник (работодатель)
           <select name="source" class="input" data-other="source"></select>
           <input type="text" name="source_other" class="input other hidden" placeholder="Свой источник">
@@ -148,6 +151,27 @@
           <div id="processed-list" class="list"></div>
         </div>
       </div>
+      <div class="card" id="debts-card">
+        <div class="card-head"><h3>Долги</h3><button class="link" id="debt-add-toggle">＋ Добавить</button></div>
+        <div class="stats" id="debt-summary"></div>
+        <form id="debt-form" class="form hidden" autocomplete="off">
+          <div class="seg wide" id="debt-dir">
+            <button type="button" data-dir="lent" class="on">Я дал в долг</button>
+            <button type="button" data-dir="borrowed">Я взял в долг</button>
+          </div>
+          <input type="text" name="person" class="input" placeholder="Кто / кому">
+          <div class="amount-row">
+            <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input" placeholder="Сумма">
+            <input type="date" name="date" class="input" required>
+          </div>
+          <input type="text" name="note" class="input" placeholder="Комментарий (необязательно)">
+          <button type="submit" class="btn primary">Записать долг</button>
+        </form>
+        <div id="debt-list" class="list"></div>
+        <button class="link hidden" id="debt-closed-toggle"></button>
+        <div id="debt-closed" class="list hidden"></div>
+      </div>
+
       <form id="expense-form" class="card form" autocomplete="off">
         <div class="amount-row">
           <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input" placeholder="Сумма" required>
@@ -159,6 +183,7 @@
       <div class="card">
         <div class="card-head"><h3>Расходы по месяцам</h3><select id="exp-year" class="input sm"></select></div>
         <div id="expense-list" class="list"></div>
+        <button class="btn ghost hidden" id="exp-more"></button>
       </div>
 
       <details class="card fold" id="data-fold">
@@ -212,6 +237,7 @@
         <button class="btn ok" id="sheet-ok">✓ Подтвердить</button>
         <button class="btn danger" id="sheet-no">✕ Отклонить</button>
       </div>
+      <button class="btn hidden" id="sheet-debt">🤝 Записать как долг</button>
       <div class="amount-row">
         <button class="btn ghost" id="sheet-close">Закрыть</button>
       </div>
@@ -219,7 +245,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=12"></script>
-  <script src="app.js?v=12"></script>
+  <script src="banks.js?v=13"></script>
+  <script src="debts.js?v=13"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

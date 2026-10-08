@@ -261,3 +261,28 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 .sheet-orig { font-size: 14px; margin-top: -6px; }
 .sheet-orig s { color: var(--hint); }
 #sheet-editbox .btn { flex: 0 0 auto; width: auto; padding: 10px 16px; }
+
+/* Поле формы без <label>: кнопки внутри label перехватывались первой кнопкой */
+.form .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint); }
+.form .field > .seg { color: var(--text); }
+
+/* Иконка скачивания в заголовке */
+.title-row { display: flex; align-items: center; justify-content: space-between; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--soft); color: var(--accent);
+}
+.icon-btn:active { opacity: .7; }
+
+/* Долги */
+#debt-summary { margin-bottom: 10px; }
+#debt-form { margin-bottom: 12px; }
+.debt-item .pmain { flex: 1; min-width: 0; }
+.debt-item .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a.lent, b.lent { color: var(--accent); }
+.pb { background: var(--bg); color: var(--text); }
+.pb.debt { background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 15px; }
+#debt-closed-toggle { display: block; margin: 10px auto 0; }
+.sheet-amount.plain { color: var(--text); }
+#exp-more { margin-top: 6px; }

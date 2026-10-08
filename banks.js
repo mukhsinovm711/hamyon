@@ -212,6 +212,7 @@ const Bank = (() => {
       // записям, загруженным до появления подробностей, дописываем их
       const old = pending.find((p) => p[7] === rec[7]);
       const done = expenses.find((e) => e[5] === rec[7]);
+      if (!done && Debts.hasKey(rec[7])) { rec.how = 'debt'; processed.push(rec); return; }
       if (done) { if (!done[6] || !done[6].length) { done[6] = details; backfilled = true; } processed.push(rec); }
       else if (old) { if (!old[8]) old[8] = details; waiting++; }
       else { pending.push(rec); added++; }
@@ -243,7 +244,8 @@ const Bank = (() => {
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
       ${amountHtml(p[2], done ? null : p[9], p[3])}
-      ${done ? '<span class="status">✓ Обработан</span>' : `<div class="pbtns">
+      ${done ? `<span class="status">${p.how === 'debt' ? '🤝 В долгах' : '✓ Обработан'}</span>` : `<div class="pbtns">
+        <button class="pb debt" data-debt="${esc(p[0])}" aria-label="Записать как долг">🤝</button>
         <button class="pb ok" data-ok="${esc(p[0])}" aria-label="Подтвердить">✓</button>
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
       </div>`}</div>`;
@@ -290,6 +292,8 @@ const Bank = (() => {
       } finally { btn.classList.remove('busy'); }
     });
     document.getElementById('pending-list').addEventListener('click', (e) => {
+      const debt = e.target.closest('[data-debt]');
+      if (debt) { toDebt(debt.dataset.debt); return; }
       const ok = e.target.closest('[data-ok]'); const no = e.target.closest('[data-no]');
       if (!ok && !no) return;
       const p = pending.find((x) => x[0] === (ok || no).dataset[ok ? 'ok' : 'no']);
@@ -342,6 +346,17 @@ const Bank = (() => {
   // Ключ операции из блока «Уже обработаны» — чтобы найти подтверждённый расход
   const keyOf = (id) => (processed.find((x) => x[0] === id) || [])[7];
 
+  // Операция из выписки → в долги («я дал в долг»), а не в расходы
+  function toDebt(id) {
+    const p = pending.find((x) => x[0] === id); if (!p) return;
+    Debts.fromPending(p);
+    pending = pending.filter((x) => x !== p);
+    persist(false);
+    haptic();
+    toast(`Записано как долг: ${p[4]}`);
+    window.render();
+  }
+
   function decide(id, accept) {
     const p = pending.find((x) => x[0] === id); if (!p) return;
     resolve([id], accept);
@@ -349,5 +364,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, detailOf, decide, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

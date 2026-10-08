@@ -598,6 +598,11 @@ document.querySelectorAll('#struct-by button').forEach((b) => b.addEventListener
 /* ================= Расходы ================= */
 const expForm = $('#expense-form');
 
+// Лента расходов: по умолчанию последние 5
+const EXP_FEED = 5;
+let expShowAll = false;
+$('#exp-more').addEventListener('click', () => { expShowAll = !expShowAll; renderMore(); });
+
 function renderMore() {
   if (!expForm.elements.date.value) expForm.elements.date.value = today();
   const ys = [...new Set(expenses.map((r) => year(r[1])))].sort((a, b) => a - b);
@@ -606,11 +611,15 @@ function renderMore() {
   yearOptions($('#exp-year'), ys, $('#exp-year').value || now);
   const y = +$('#exp-year').value;
   const rows = expenses.filter((r) => year(r[1]) === y).sort(sortByDateDesc);
+  const shown = expShowAll ? rows : rows.slice(0, EXP_FEED);
+  const monthTotal = (k) => sum(rows.filter((r) => ym(r[1]) === k));
   const groups = {};
-  rows.forEach((r) => (groups[ym(r[1])] = groups[ym(r[1])] || []).push(r));
+  shown.forEach((r) => (groups[ym(r[1])] = groups[ym(r[1])] || []).push(r));
+  $('#exp-more').classList.toggle('hidden', rows.length <= EXP_FEED);
+  $('#exp-more').textContent = expShowAll ? 'Свернуть' : `Показать все (${rows.length})`;
   $('#expense-list').innerHTML = Object.keys(groups).map((k) => {
     const g = groups[k];
-    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}</span><span>${fmt(sum(g))}</span></div>`
+    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}</span><span>${fmt(monthTotal(k))}</span></div>`
       + g.map((r) => { const x = exp(r);
         return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
@@ -620,7 +629,7 @@ function renderMore() {
   const cloudInfo = Store.summary();
   $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;
 }
-$('#exp-year').addEventListener('change', renderMore);
+$('#exp-year').addEventListener('change', () => { expShowAll = false; renderMore(); });
 
 expForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -679,15 +688,17 @@ function detailByRef(ref) {
 function openSheet(d) {
   sheetData = d;
   $('#sheet-title').textContent = d.title;
-  $('#sheet-amount').textContent = '−' + fmt(d.amount, d.cur);
+  $('#sheet-amount').textContent = (d.sign ?? '−') + fmt(d.amount, d.cur);
+  $('#sheet-amount').classList.toggle('plain', d.sign === '');
   $('#sheet-orig').classList.toggle('hidden', d.orig == null);
-  if (d.orig != null) $('#sheet-orig-val').textContent = '−' + fmt(d.orig, d.cur);
+  if (d.orig != null) $('#sheet-orig-val').textContent = (d.sign ?? '−') + fmt(d.orig, d.cur);
   $('#sheet-edit').classList.toggle('hidden', !d.ref);
   $('#sheet-edit').textContent = '✎ Изменить сумму';
   $('#sheet-editbox').classList.add('hidden');
   $('#sheet-fields').innerHTML = d.fields.filter(([, v]) => v).map(([k, v]) =>
     `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   $('#sheet-decide').classList.toggle('hidden', !d.pendingId);
+  $('#sheet-debt').classList.toggle('hidden', !d.pendingId);
   $('#sheet').classList.remove('hidden');
   requestAnimationFrame(() => $('#sheet').classList.add('open'));
 }
@@ -734,6 +745,7 @@ $('#sheet-restore').addEventListener('click', () => {
 });
 $('#sheet-ok').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, true); });
 $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.decide(id, false); });
+$('#sheet-debt').addEventListener('click', () => { const id = sheetData.pendingId; closeSheet(); Bank.toDebt(id); });
 
 // Удержание: строка заполняется подсветкой, через 1,5 секунды открывается окно
 (function setupLongPress() {
@@ -750,7 +762,9 @@ $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId;
       cancel();
       // обработанная операция показывается как её подтверждённый расход, чтобы её можно было править
       const done = kind === 'proc' && expenses.find((x) => x[5] === Bank.keyOf(id));
-      const d = kind === 'exp' ? expenseDetail(id) : done ? expenseDetail(done[0]) : Bank.detailOf(kind, id);
+      const debt = kind === 'proc' && Debts.byKey(Bank.keyOf(id));
+      const d = kind === 'exp' ? expenseDetail(id) : kind === 'debt' ? Debts.detail(id)
+        : done ? expenseDetail(done[0]) : debt ? Debts.detail(debt[0]) : Bank.detailOf(kind, id);
       if (!d) return;
       try { tg && tg.HapticFeedback.impactOccurred('medium'); } catch (err) {}
       openSheet(d);
@@ -760,6 +774,37 @@ $('#sheet-no').addEventListener('click', () => { const id = sheetData.pendingId;
   ['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, cancel));
   document.addEventListener('contextmenu', (e) => { if (e.target.closest('.pressable')) e.preventDefault(); });
 })();
+
+/* ================= Скачать поступления =================
+ * Excel в формате листа data из income.report.xlsx: заголовки с B2,
+ * дата разбита на «day N» / месяц / год. Файл можно снова загрузить через импорт.
+ */
+async function downloadIncomes() {
+  const rows = [[], [null, 'data: day', 'data: month', 'data: year', 'amount', 'curriency', 'type', 'monetary form', 'income type']];
+  [...incomes].sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)).forEach((r) => {
+    const [y, m, d] = r[1].split('-');
+    rows.push([null, `day ${+d}`, MONTHS_EN[+m - 1], +y, r[2], r[3], r[4], r[5], r[6]]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [2, 9, 11, 7, 9, 9, 13, 14, 12].map((wch) => ({ wch }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'data');
+  const name = `hamyoon-data-${today()}.xlsx`;
+  const file = new File([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], name,
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  // на телефоне — системное меню «Поделиться / Сохранить в файлы», иначе обычная загрузка
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(`Скачивается ${name}`);
+}
+window.hamyonBuildIncomesFile = downloadIncomes; // для отладки
+$('#btn-download').addEventListener('click', () => downloadIncomes().catch((e) => toast('Не удалось скачать: ' + e.message)));
 
 /* ================= Импорт / экспорт ================= */
 const recKey = (r) => [r[1], r[2], r[3], r[4] ?? '', r[5] ?? '', r[6] ?? ''].join('|');
@@ -880,6 +925,7 @@ $('#btn-clear').addEventListener('click', async () => {
 function render() {
   ({ home: renderHome, history: renderHistory, reports: renderReports, more: renderMore, add: () => {} })[currentView]();
   Bank.render();
+  Debts.render();
 }
 
 (async function init() {
@@ -888,10 +934,11 @@ function render() {
     $('#app').innerHTML = '<div class="empty-state" style="padding-top:35vh">🔒 Нет доступа</div>';
     return;
   }
-  [incomes, expenses] = await Promise.all([Store.load('inc'), Store.load('exp'), Bank.load()]);
+  [incomes, expenses] = await Promise.all([Store.load('inc'), Store.load('exp'), Bank.load(), Debts.load()]);
   Bank.setup();
+  Debts.setup();
   resetForm();
   render();
-  const back = (Store.restored.exp || 0) + (Store.restored.inc || 0) + (Store.restored.pend || 0);
+  const back = Object.values(Store.restored).reduce((a, b) => a + b, 0);
   if (back) toast(`Восстановлено записей с устройства: ${back}`);
 })();
