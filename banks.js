@@ -231,7 +231,7 @@ const Bank = (() => {
     const set = new Set(ids);
     if (accept) {
       pending.filter((p) => set.has(p[0]))
-        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || [], p[9] ?? null]));
+        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || [], p[9] ?? null, 'card']));
     }
     pending = pending.filter((p) => !set.has(p[0]));
     persist(accept);

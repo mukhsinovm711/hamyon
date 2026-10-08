@@ -421,6 +421,7 @@ function setAddKind(k) {
   $('#form-title').textContent = k === 'income' ? 'Новый доход' : 'Новый расход';
   if (k === 'expense') {
     if (!expForm.elements.date.value) expForm.elements.date.value = today();
+    renderExpFormSeg(expFormValue || (expenses[expenses.length - 1] || [])[8] || 'cash');
     // валюта по умолчанию — как у последнего добавленного расхода
     const last = expenses[expenses.length - 1];
     if (!expForm.dataset.curTouched) expForm.elements.cur.value = last ? last[3] : mainCurrency();
@@ -627,7 +628,8 @@ $('#exp-more').addEventListener('click', () => { expShowAll = !expShowAll; rende
 function expenseMatches(r, q) {
   const money = (n) => (n == null ? '' : `${n} ${String(n).replace('.', ',')}`);
   const details = (r[6] || []).map(([, v]) => v).join(' ');
-  return [r[4], money(r[2]), money(r[7]), fmtDate(r[1]), r[1], details].join(' ').toLowerCase().includes(q);
+  return [r[4], money(r[2]), money(r[7]), fmtDate(r[1]), r[1], r[8] ? label(FORM_LABELS, r[8]) : '', details]
+    .join(' ').toLowerCase().includes(q);
 }
 $('#exp-search').addEventListener('input', renderMore);
 
@@ -663,7 +665,7 @@ function renderMore() {
     const g = groups[k];
     return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${monthTotal(k)}</span></div>`
       + g.map((r) => { const x = exp(r);
-        return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
+        return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : 'Расходов за этот год нет'}</div>`;
@@ -680,7 +682,7 @@ expForm.addEventListener('submit', (e) => {
   if (!(amount > 0)) return toast('Введите сумму');
   const cur = f.cur.value.trim().toUpperCase() || mainCurrency();
   if (!/^[A-Z]{3}$/.test(cur)) return toast('Валюта — три латинские буквы, например EUR');
-  expenses.push([uid(), f.date.value, amount, cur, f.note.value.trim()]);
+  expenses.push([uid(), f.date.value, amount, cur, f.note.value.trim(), null, null, null, expFormValue]);
   Store.save('exp', expenses);
   f.amount.value = ''; f.note.value = ''; f.date.value = today();
   haptic();
@@ -714,6 +716,15 @@ function applyAmount(rec, origIdx, value) {
 const amountHtml = (amount, orig, cur) => `<div class="a neg">−${fmt(amount, cur)}${orig != null
   ? `<s class="orig">−${fmt(orig, cur)}</s>` : ''}</div>`;
 
+// Расход: [id, date, amount, cur, note, ключ операции, детали, исходная сумма, форма оплаты]
+let expFormValue = null;
+function renderExpFormSeg(selected) {
+  expFormValue = selected;
+  $('#exp-form-seg').innerHTML = ['cash', 'card', 'sertificate'].map((v) =>
+    `<button type="button" data-v="${v}" class="${v === selected ? 'on' : ''}">${label(FORM_LABELS, v)}</button>`).join('');
+}
+$('#exp-form-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) renderExpFormSeg(b.dataset.v); });
+
 function expenseDetail(id) {
   const r = expenses.find((x) => x[0] === id);
   if (!r) return null;
@@ -721,7 +732,8 @@ function expenseDetail(id) {
   return {
     title: x.note || 'Расход', amount: x.amount, orig: r[7] ?? null, cur: x.cur, pendingId: null,
     ref: { type: 'exp', id },
-    fields: [['Дата', fmtDate(x.date)], ['Статус', r[5] ? 'Подтверждён из выписки' : 'Добавлен вручную'],
+    fields: [['Дата', fmtDate(x.date)], ['Форма', r[8] ? label(FORM_LABELS, r[8]) : ''],
+      ['Статус', r[5] ? 'Подтверждён из выписки' : 'Добавлен вручную'],
       ...(r[6] && r[6].length ? r[6] : [['Комментарий', x.note || '']])],
   };
 }

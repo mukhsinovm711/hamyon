@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
   <main id="app">
@@ -84,6 +84,9 @@
         <label>Дата
           <input type="date" name="date" class="input" required>
         </label>
+        <div class="field">Форма
+          <div class="seg wide" id="exp-form-seg"></div>
+        </div>
         <label>Комментарий
           <input type="text" name="note" class="input" placeholder="Например: коммуналка (необязательно)">
         </label>
@@ -273,8 +276,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=17"></script>
-  <script src="debts.js?v=17"></script>
-  <script src="app.js?v=17"></script>
+  <script src="banks.js?v=18"></script>
+  <script src="debts.js?v=18"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
