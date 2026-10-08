@@ -431,6 +431,7 @@ $('#add-kind').addEventListener('click', (e) => { const b = e.target.closest('bu
 
 function resetForm() {
   editingId = null;
+  expForm.elements.date.value = today();
   $('#add-kind').classList.remove('hidden');
   setAddKind(addKind);
   $('#btn-delete').classList.add('hidden');
@@ -536,12 +537,23 @@ function renderCalendar() {
   for (let d = 1; d <= days; d++) {
     const v = byDay[d];
     const i = v ? 0.25 + 0.75 * (v / max) : 0;
+    const date = `${key}-${String(d).padStart(2, '0')}`;
     html += v
-      ? `<div class="d has ${i > 0.55 ? 'dark' : ''}" style="--i:${i.toFixed(2)}" title="${fmt(v)}"><span class="n">${d}</span><span class="v">${fmtShort(v)}</span></div>`
-      : `<div class="d"><span class="n">${d}</span></div>`;
+      ? `<div class="d has ${i > 0.55 ? 'dark' : ''}" data-date="${date}" style="--i:${i.toFixed(2)}" title="${fmt(v)}"><span class="n">${d}</span><span class="v">${fmtShort(v)}</span></div>`
+      : `<div class="d" data-date="${date}"><span class="n">${d}</span></div>`;
   }
   $('#calendar').innerHTML = html;
 }
+
+// Нажатие на день — как «＋», но с датой этого дня
+$('#calendar').addEventListener('click', (e) => {
+  const cell = e.target.closest('[data-date]'); if (!cell) return;
+  editingId = null;
+  show('add');
+  form.elements.date.value = cell.dataset.date;
+  expForm.elements.date.value = cell.dataset.date;
+  try { tg && tg.HapticFeedback.selectionChanged(); } catch (err) {}
+});
 ['#cal-year', '#cal-month'].forEach((s) => $(s).addEventListener('change', renderCalendar));
 
 // Лист "expenses": доход за период (здесь — честное сравнение дат включительно)

@@ -294,3 +294,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 #exp-found { margin-bottom: 4px; }
 
 #add-kind { margin-bottom: 14px; }
+
+/* Дни календаря открывают «＋» с этой датой */
+.cal .d[data-date] { cursor: pointer; transition: transform .1s; }
+.cal .d[data-date]:active { transform: scale(.92); }
