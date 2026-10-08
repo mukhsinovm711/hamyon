@@ -411,9 +411,22 @@ function fillForm(x) {
   renderFormSeg(x.form || 'cash');
 }
 
+// «＋»: доход или расход
+let addKind = 'income';
+function setAddKind(k) {
+  addKind = k;
+  document.querySelectorAll('#add-kind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k));
+  $('#income-form').classList.toggle('hidden', k !== 'income');
+  $('#expense-form').classList.toggle('hidden', k !== 'expense');
+  $('#form-title').textContent = k === 'income' ? 'Новый доход' : 'Новый расход';
+  if (k === 'expense' && !expForm.elements.date.value) expForm.elements.date.value = today();
+}
+$('#add-kind').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setAddKind(b.dataset.k); });
+
 function resetForm() {
   editingId = null;
-  $('#form-title').textContent = 'Новый доход';
+  $('#add-kind').classList.remove('hidden');
+  setAddKind(addKind);
   $('#btn-delete').classList.add('hidden');
   $('#btn-cancel').classList.add('hidden');
   // по умолчанию: самый частый тип, источник и валюта — из последней записи
@@ -425,6 +438,8 @@ function openEdit(id) {
   const r = incomes.find((x) => x[0] === id); if (!r) return;
   editingId = id;
   show('add');
+  setAddKind('income');
+  $('#add-kind').classList.add('hidden');
   $('#form-title').textContent = 'Редактирование';
   $('#btn-delete').classList.remove('hidden');
   $('#btn-cancel').classList.remove('hidden');
@@ -612,7 +627,6 @@ function expenseMatches(r, q) {
 $('#exp-search').addEventListener('input', renderMore);
 
 function renderMore() {
-  if (!expForm.elements.date.value) expForm.elements.date.value = today();
   const ys = [...new Set(expenses.map((r) => year(r[1])))].sort((a, b) => a - b);
   const now = year(today());
   if (!ys.includes(now)) ys.push(now);
@@ -651,10 +665,10 @@ expForm.addEventListener('submit', (e) => {
   if (!(amount > 0)) return toast('Введите сумму');
   expenses.push([uid(), f.date.value, amount, mainCurrency(), f.note.value.trim()]);
   Store.save('exp', expenses);
-  f.amount.value = ''; f.note.value = '';
+  f.amount.value = ''; f.note.value = ''; f.date.value = today();
   haptic();
-  toast('Расход добавлен');
-  renderMore();
+  toast('Расход добавлен: ' + fmt(amount));
+  show('more');
 });
 $('#expense-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-del-exp]'); if (!b) return;

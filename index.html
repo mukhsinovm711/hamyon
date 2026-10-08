@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
   <main id="app">
@@ -70,6 +70,22 @@
     <!-- Добавить / редактировать -->
     <section class="view" id="view-add">
       <h2 id="form-title">Новый доход</h2>
+      <div class="seg wide" id="add-kind">
+        <button type="button" data-k="income" class="on">Доход</button>
+        <button type="button" data-k="expense">Расход</button>
+      </div>
+      <form id="expense-form" class="form hidden" autocomplete="off">
+        <label>Сумма
+          <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input big" placeholder="0" required>
+        </label>
+        <label>Дата
+          <input type="date" name="date" class="input" required>
+        </label>
+        <label>Комментарий
+          <input type="text" name="note" class="input" placeholder="Например: коммуналка (необязательно)">
+        </label>
+        <button type="submit" class="btn primary">Сохранить расход</button>
+      </form>
       <form id="income-form" class="form" autocomplete="off">
         <label>Сумма
           <div class="amount-row">
@@ -187,14 +203,6 @@
         <div id="debt-closed" class="list hidden"></div>
       </div>
 
-      <form id="expense-form" class="card form" autocomplete="off">
-        <div class="amount-row">
-          <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input" placeholder="Сумма" required>
-          <input type="date" name="date" class="input" required>
-        </div>
-        <input type="text" name="note" class="input" placeholder="Комментарий (необязательно)">
-        <button type="submit" class="btn primary">Добавить расход</button>
-      </form>
       <div class="card">
         <div class="card-head"><h3>Расходы по месяцам</h3><select id="exp-year" class="input sm"></select></div>
         <input type="search" id="exp-search" class="input" placeholder="Поиск по расходам…">
@@ -262,8 +270,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=15"></script>
-  <script src="debts.js?v=15"></script>
-  <script src="app.js?v=15"></script>
+  <script src="banks.js?v=16"></script>
+  <script src="debts.js?v=16"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>
