@@ -1,4 +1,4 @@
-"""Минимальный бот для запуска мини-аппа Hamyon. Только стандартная библиотека Python.
+"""Минимальный бот для запуска мини-аппа Hamyoon. Только стандартная библиотека Python.
 
 Запуск: заполните BOT_TOKEN и WEBAPP_URL в файле .env рядом со скриптом, затем
     python bot.py
@@ -42,9 +42,9 @@ def call(method, **params):
 
 
 def main():
-    # Кнопка «Hamyon» слева от поля ввода во всех чатах с ботом
+    # Кнопка «Hamyoon» слева от поля ввода во всех чатах с ботом
     call("setChatMenuButton", menu_button={
-        "type": "web_app", "text": "Hamyon", "web_app": {"url": WEBAPP_URL},
+        "type": "web_app", "text": "Hamyoon", "web_app": {"url": WEBAPP_URL},
     })
     print("Бот запущен, меню-кнопка установлена:", WEBAPP_URL)
 
@@ -64,9 +64,9 @@ def main():
             if OWNER_ID and msg["from"]["id"] != OWNER_ID:
                 continue
             call("sendMessage", chat_id=msg["chat"]["id"],
-                 text="💰 Hamyon — учёт доходов.\nНажмите кнопку ниже, чтобы открыть приложение.",
+                 text="💰 Hamyoon — учёт доходов.\nНажмите кнопку ниже, чтобы открыть приложение.",
                  reply_markup={"inline_keyboard": [[
-                     {"text": "Открыть Hamyon", "web_app": {"url": WEBAPP_URL}},
+                     {"text": "Открыть Hamyoon", "web_app": {"url": WEBAPP_URL}},
                  ]]})
 
 

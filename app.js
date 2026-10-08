@@ -39,11 +39,17 @@ const SOURCE_LABELS = { 'tax back': 'Возврат налога' };
 const label = (map, v) => map[v] || v;
 
 /* ================= Хранилище =================
- * Telegram CloudStorage (синхронизируется между устройствами пользователя),
- * значения до 4096 символов — поэтому данные режутся на чанки.
- * Вне Telegram — localStorage.
+ * Основная копия — Telegram CloudStorage (привязана к аккаунту, видна на всех устройствах),
+ * запасная — localStorage устройства. Значение в CloudStorage до 4096 символов,
+ * поэтому данные режутся на части.
+ *
+ * Запись атомарная: новая версия пишется в свободный слот (a или b), и только потом
+ * переключается указатель <prefix>_n = "слот:частей:ревизия". Если приложение закрыли
+ * посреди записи, в облаке остаётся прежняя целая версия. При открытии сравниваются
+ * ревизии облака и устройства, и берётся более новая.
  */
 const CHUNK = 4000;
+const LS = 'hamyon_'; // префикс в localStorage: не менять, иначе потеряется копия на устройстве
 const cloud = inTelegram && tg.isVersionAtLeast('6.9') ? tg.CloudStorage : null;
 const cs = (method, ...args) => new Promise((res, rej) =>
   cloud[method](...args, (err, val) => (err ? rej(err) : res(val))));
@@ -51,45 +57,123 @@ const cs = (method, ...args) => new Promise((res, rej) =>
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
-async function cloudLoad(prefix) {
-  const n = parseInt(await cs('getItem', prefix + '_n'), 10);
-  if (!n) return null;
-  const keys = Array.from({ length: n }, (_, i) => prefix + i);
-  const vals = await cs('getItems', keys);
-  return JSON.parse(keys.map((k) => vals[k] || '').join(''));
+// Не-ASCII символы как \uXXXX: длина значения в символах тогда совпадает с длиной в байтах
+const ascii = (str) => str.replace(/[\u007f-\uffff]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+const PTR = /^([ab]):(\d+):(\d+)$/;
+
+function chunkKeys(prefix, ptr) {
+  const m = PTR.exec(ptr || '');
+  if (m) return Array.from({ length: +m[2] }, (_, i) => `${prefix}_${m[1]}${i}`);
+  return Array.from({ length: parseInt(ptr, 10) || 0 }, (_, i) => prefix + i); // старый формат
 }
 
-async function cloudSave(prefix, data) {
-  const str = JSON.stringify(data);
-  const chunks = [];
-  for (let i = 0; i < str.length; i += CHUNK) chunks.push(str.slice(i, i + CHUNK));
-  const oldN = parseInt(await cs('getItem', prefix + '_n'), 10) || 0;
-  for (let i = 0; i < chunks.length; i++) await cs('setItem', prefix + i, chunks[i]);
-  await cs('setItem', prefix + '_n', String(chunks.length));
-  const stale = [];
-  for (let i = chunks.length; i < oldN; i++) stale.push(prefix + i);
-  if (stale.length) await cs('removeItems', stale);
+async function cloudLoad(prefix) {
+  const ptr = await cs('getItem', prefix + '_n');
+  const keys = chunkKeys(prefix, ptr);
+  if (!keys.length) return null;
+  const vals = await cs('getItems', keys);
+  const data = JSON.parse(keys.map((k) => vals[k] ?? '').join(''));
+  const m = PTR.exec(ptr);
+  return { data, rev: m ? +m[3] : 0 };
+}
+
+async function cloudSave(prefix, data, rev) {
+  const ptr = await cs('getItem', prefix + '_n');
+  const m = PTR.exec(ptr || '');
+  const slot = m && m[1] === 'a' ? 'b' : 'a';
+  const str = ascii(JSON.stringify(data));
+  const n = Math.max(1, Math.ceil(str.length / CHUNK));
+  for (let i = 0; i < n; i++) await cs('setItem', `${prefix}_${slot}${i}`, str.slice(i * CHUNK, (i + 1) * CHUNK));
+  await cs('setItem', prefix + '_n', `${slot}:${n}:${rev}`);
+  // убрать части прежних версий
+  const keep = new Set(chunkKeys(prefix, `${slot}:${n}:${rev}`));
+  const own = new RegExp(`^${prefix}(_[ab])?\\d+$`);
+  const stale = (await cs('getKeys')).filter((k) => own.test(k) && !keep.has(k));
+  if (stale.length) await cs('removeItems', stale).catch(() => {});
 }
 
 const Store = {
-  async load(prefix) {
-    const local = JSON.parse(lsGet('hamyon_' + prefix) || 'null');
-    if (!cloud) return local || [];
-    try {
-      const remote = await cloudLoad(prefix);
-      if (remote) return remote;
-      if (local && local.length) { await cloudSave(prefix, local); return local; }
-    } catch (e) { console.warn('CloudStorage load failed', e); return local || []; }
-    return [];
-  },
+  status: {},       // prefix -> { ok, error }
+  restored: {},     // prefix -> сколько записей восстановлено с устройства
+  blocked: new Set(),
+  inflight: 0,
   queue: Promise.resolve(),
+
+  readLocal(prefix) {
+    try {
+      const v = JSON.parse(lsGet(LS + prefix) || 'null');
+      if (Array.isArray(v)) return { data: v, rev: 0 };
+      return v && Array.isArray(v.data) ? v : null;
+    } catch (e) { return null; }
+  },
+  writeLocal(prefix, data, rev) { lsSet(LS + prefix, JSON.stringify({ rev, data })); },
+
+  async load(prefix) {
+    const local = this.readLocal(prefix);
+    if (!cloud) return local ? local.data : [];
+    let remote;
+    try {
+      remote = await cloudLoad(prefix);
+    } catch (e) {
+      console.warn('CloudStorage load failed', e);
+      this.status[prefix] = { error: 'не удалось прочитать облако' };
+      // без копии на устройстве не перезаписываем облако пустыми данными
+      if (!local || !local.data.length) this.blocked.add(prefix);
+      return local ? local.data : [];
+    }
+    if (!remote) {
+      if (local && local.data.length) this.save(prefix, local.data);
+      return local ? local.data : [];
+    }
+    if (local && local.rev > remote.rev) {
+      // облако отстало: последняя запись не дошла — догоняем копией с устройства
+      this.restored[prefix] = local.data.filter((r) => !remote.data.some((x) => x[0] === r[0])).length;
+      this.save(prefix, local.data);
+      return local.data;
+    }
+    if (local && !local.rev && !remote.rev) {
+      // старый формат без ревизий: добавляем записи, которые есть только на устройстве
+      const ids = new Set(remote.data.map((r) => r[0]));
+      const extra = local.data.filter((r) => !ids.has(r[0]));
+      if (extra.length) {
+        const merged = [...remote.data, ...extra];
+        this.restored[prefix] = extra.length;
+        this.save(prefix, merged);
+        return merged;
+      }
+    }
+    this.writeLocal(prefix, remote.data, remote.rev);
+    return remote.data;
+  },
+
   save(prefix, data) {
-    lsSet('hamyon_' + prefix, JSON.stringify(data));
-    if (!cloud) return Promise.resolve();
-    this.queue = this.queue.then(() => cloudSave(prefix, data)).catch((e) => {
-      console.error(e); toast('Ошибка синхронизации с облаком');
-    });
+    const rev = Date.now();
+    this.writeLocal(prefix, data, rev);
+    if (!cloud || this.blocked.has(prefix)) return Promise.resolve();
+    // пока идёт запись, Telegram спросит подтверждение перед закрытием
+    if (this.inflight++ === 0 && tg.isVersionAtLeast('6.2')) tg.enableClosingConfirmation();
+    this.queue = this.queue
+      .then(() => cloudSave(prefix, data, rev))
+      .then(() => { this.status[prefix] = { ok: true }; })
+      .catch((e) => {
+        console.error(e);
+        this.status[prefix] = { error: String((e && e.message) || e) };
+        toast('Не удалось сохранить в облако Telegram. Копия осталась на устройстве');
+      })
+      .finally(() => {
+        if (--this.inflight === 0 && tg.isVersionAtLeast('6.2')) tg.disableClosingConfirmation();
+        if (currentView === 'more') renderMore();
+      });
     return this.queue;
+  },
+
+  summary() {
+    if (!cloud) return 'Открыто вне Telegram — данные хранятся только в этом браузере.';
+    const errors = Object.entries(this.status).filter(([, v]) => v.error);
+    if (this.blocked.size) return '⚠️ Облако Telegram сейчас недоступно, изменения пока не сохраняются. Перезапустите приложение.';
+    if (errors.length) return `⚠️ Последнее сохранение в облако не прошло (${errors[0][1].error}). Копия на устройстве цела, при следующем открытии приложение досохранит её.`;
+    if (this.inflight) return 'Сохраняю в облако Telegram…';
+    return '✓ Данные сохранены в облаке Telegram и доступны на всех ваших устройствах.';
   },
 };
 
@@ -533,8 +617,7 @@ function renderMore() {
       }).join('');
   }).join('') || '<div class="empty-state">Расходов за этот год нет</div>';
 
-  const cloudInfo = cloud ? 'Данные хранятся в облаке Telegram и доступны на всех ваших устройствах.'
-    : 'Открыто вне Telegram — данные хранятся локально в браузере.';
+  const cloudInfo = Store.summary();
   $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;
 }
 $('#exp-year').addEventListener('change', renderMore);
@@ -809,4 +892,6 @@ function render() {
   Bank.setup();
   resetForm();
   render();
+  const back = (Store.restored.exp || 0) + (Store.restored.inc || 0) + (Store.restored.pend || 0);
+  if (back) toast(`Восстановлено записей с устройства: ${back}`);
 })();

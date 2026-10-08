@@ -1,4 +1,4 @@
-# Hamyon — Telegram Mini App для учёта доходов
+# Hamyoon — Telegram Mini App для учёта доходов
 
 Мини-апп повторяет логику `income.report.xlsx`:
 
@@ -30,7 +30,7 @@
    - в BotFather: `/mybots` → бот → *Bot Settings* → *Menu Button* → указать URL; или `/newapp` для прямой ссылки `t.me/<bot>/<app>`;
    - либо заполнить `BOT_TOKEN` и `WEBAPP_URL` в файле `.env` и запустить `python bot.py` (только стандартная библиотека).
      `.env` добавлен в `.gitignore` — токен не попадёт в репозиторий.
-4. Открыть бота → кнопка **Hamyon** → «Ещё» → «Импорт из Excel» → выбрать `income.report.xlsx`.
+4. Открыть бота → кнопка **Hamyoon** → «Ещё» → «Импорт из Excel» → выбрать `income.report.xlsx`.
 
 ## Локальная проверка
 
