@@ -30,7 +30,7 @@ const Debts = (() => {
     const lent = d[6] === 'lent';
     return `<div class="item pressable debt-item${closed ? ' done' : ''}" data-detail="debt:${esc(d[0])}">
       <div class="pmain"><div class="t">${esc(d[4])}</div>
-        <div class="s">${lent ? 'Мне должны' : 'Я должен'} · ${fmtDate(d[1])}${d[5] ? ' · ' + esc(d[5]) : ''}${closed ? ` · возвращён ${fmtDate(d[7])}` : ''}</div></div>
+        <div class="s">${lent ? 'Мне должны' : 'Я должен'} · ${fmtDate(d[1])}${d[5] ? ' · ' + (BANKS.includes(d[5]) ? bankTag(d[5]) : esc(d[5])) : ''}${closed ? ` · возвращён ${fmtDate(d[7])}` : ''}</div></div>
       <div class="a ${lent ? 'lent' : 'neg'}">${fmt(d[2], d[3])}</div>
       <div class="pbtns">${closed
         ? `<button class="pb" data-reopen="${esc(d[0])}" aria-label="Вернуть в открытые">↺</button>

@@ -298,3 +298,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 /* Дни календаря открывают «＋» с этой датой */
 .cal .d[data-date] { cursor: pointer; transition: transform .1s; }
 .cal .d[data-date]:active { transform: scale(.92); }
+
+/* Лента расходов: чуть мельче, банк — цветной меткой */
+.exp-item .pmain { flex: 1; min-width: 0; }
+.exp-item .t { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.exp-item .s { font-size: 11.5px; }
+.exp-item .a { font-size: 14px; }
+.exp-item .tag, .debt-item .tag { vertical-align: 1px; }

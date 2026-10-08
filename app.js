@@ -655,6 +655,14 @@ function sumByCur(rows) {
 }
 expForm.elements.cur.addEventListener('input', () => { expForm.dataset.curTouched = '1'; });
 
+// «Delicio · Revolut» → ['Delicio', 'Revolut']: банк показывается цветной меткой
+const BANKS = ['Revolut', 'Wise'];
+function splitBank(note) {
+  const i = (note || '').lastIndexOf(' · ');
+  return i > 0 && BANKS.includes(note.slice(i + 3)) ? [note.slice(0, i), note.slice(i + 3)] : [note, null];
+}
+const bankTag = (bank) => `<span class="tag ${bank.toLowerCase()}">${esc(bank)}</span>`;
+
 function renderMore() {
   const ys = [...new Set(expenses.map((r) => year(r[1])))].sort((a, b) => a - b);
   const now = year(today());
@@ -684,7 +692,8 @@ function renderMore() {
     const g = groups[k];
     return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${monthTotal(k)}</span></div>`
       + g.map((r) => { const x = exp(r);
-        return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
+        const [name, bank] = splitBank(x.note);
+        return `<div class="item pressable exp-item" data-detail="exp:${esc(x.id)}"><div class="pmain"><div class="t">${esc(name || 'Расход')}</div><div class="s">${fmtDate(x.date)}${bank ? ' · ' + bankTag(bank) : ''}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : m ? 'Расходов за этот месяц нет' : 'Расходов за этот год нет'}</div>`;
