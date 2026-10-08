@@ -9,6 +9,24 @@ if (tg) {
   tg.expand();
   if (inTelegram) document.documentElement.classList.add('tg');
 }
+
+/* Полноэкранный режим на телефоне: шапки Telegram нет, вместо неё своя (#topbar)
+ * в строке между кнопками Telegram «Закрыть» и «⋯». Отступы берутся из safe area. */
+function applySafeArea() {
+  const root = document.documentElement.style;
+  const sa = (tg && tg.safeAreaInset) || {};
+  const ca = (tg && tg.contentSafeAreaInset) || {};
+  root.setProperty('--hy-safe-top', (sa.top || 0) + 'px');
+  root.setProperty('--hy-safe-bottom', (sa.bottom || 0) + 'px');
+  root.setProperty('--hy-content-top', (ca.top || 0) + 'px');
+  document.body.classList.toggle('fullscreen', !!(tg && tg.isFullscreen));
+}
+if (inTelegram && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); // свайп вниз не закрывает приложение при прокрутке
+if (inTelegram && tg.isVersionAtLeast('8.0')) {
+  ['fullscreenChanged', 'safeAreaChanged', 'contentSafeAreaChanged'].forEach((ev) => tg.onEvent(ev, applySafeArea));
+  if (['ios', 'android'].includes(tg.platform) && !tg.isFullscreen) tg.requestFullscreen();
+}
+applySafeArea();
 const haptic = (kind = 'success') => { try { tg && tg.HapticFeedback.notificationOccurred(kind); } catch (e) {} };
 const confirmBox = (text) => new Promise((res) => {
   if (inTelegram && tg.isVersionAtLeast('6.2')) tg.showConfirm(text, res);

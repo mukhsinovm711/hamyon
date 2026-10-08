@@ -306,8 +306,19 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 .exp-item .a { font-size: 14px; }
 .exp-item .tag, .debt-item .tag { vertical-align: 1px; }
 
-/* Подпись под «＋» */
-.tabbar button.add .copy {
-  font-size: 8.5px; line-height: 1; color: var(--hint); opacity: .8;
-  white-space: nowrap; margin-top: 2px; pointer-events: none;
+/* Своя шапка: обычно — мелкая подпись вверху страницы,
+   в полноэкранном режиме — заголовок между кнопками Telegram */
+.topbar { text-align: center; padding: 8px 16px 0; }
+.topbar .tb-title { display: none; }
+.topbar .tb-sub { font-size: 10px; color: var(--hint); opacity: .8; }
+body.fullscreen { padding-top: calc(var(--hy-safe-top) + var(--hy-content-top)); }
+body.fullscreen .topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 15;
+  padding: var(--hy-safe-top) 90px 0; height: calc(var(--hy-safe-top) + var(--hy-content-top));
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); line-height: 1.2;
 }
+body.fullscreen .topbar .tb-title { display: block; font-size: 16px; font-weight: 600; color: var(--text); }
+body.fullscreen .topbar .tb-sub { font-size: 10px; }
+body.fullscreen .tabbar { padding-bottom: calc(6px + max(env(safe-area-inset-bottom), var(--hy-safe-bottom))); }
+body.fullscreen { padding-bottom: calc(72px + max(env(safe-area-inset-bottom), var(--hy-safe-bottom))); }

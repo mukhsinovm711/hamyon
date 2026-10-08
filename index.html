@@ -7,9 +7,13 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
+  <header class="topbar" id="topbar">
+    <div class="tb-title">Hamyoon</div>
+    <div class="tb-sub">© 2026 by mukhsinovm</div>
+  </header>
   <main id="app">
     <!-- Обзор -->
     <section class="view active" id="view-home">
@@ -245,7 +249,7 @@
   <nav class="tabbar">
     <button data-view="home" class="on"><span>◉</span>Обзор</button>
     <button data-view="history"><span>☰</span>История</button>
-    <button data-view="add" class="add" aria-label="Добавить"><span>＋</span><small class="copy">© 2026 by mukhsinovm</small></button>
+    <button data-view="add" class="add" aria-label="Добавить"><span>＋</span></button>
     <button data-view="reports"><span>▤</span>Отчёты</button>
     <button data-view="more"><span>⋯</span>Ещё<i class="badge hidden" id="tab-badge"></i></button>
   </nav>
@@ -279,8 +283,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=22"></script>
-  <script src="debts.js?v=22"></script>
-  <script src="app.js?v=22"></script>
+  <script src="banks.js?v=23"></script>
+  <script src="debts.js?v=23"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>
