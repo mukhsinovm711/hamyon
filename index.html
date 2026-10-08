@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <main id="app">
@@ -46,6 +46,21 @@
       <div class="title-row">
         <h2>История</h2>
         <button class="icon-btn" id="btn-download" aria-label="Скачать поступления в Excel" title="Скачать поступления в Excel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button>
+      </div>
+      <div class="card hidden" id="download-box">
+        <div class="card-head"><h3>Скачать поступления</h3><span class="muted small" id="dl-count"></span></div>
+        <div class="chips" id="dl-presets">
+          <button data-p="all" class="on">Всё время</button>
+          <button data-p="year">Этот год</button>
+          <button data-p="prev">Прошлый год</button>
+          <button data-p="month">Этот месяц</button>
+        </div>
+        <div class="period">
+          <input type="date" id="dl-from" class="input">
+          <span class="muted">—</span>
+          <input type="date" id="dl-to" class="input">
+        </div>
+        <button class="btn primary" id="dl-go">Скачать Excel</button>
       </div>
       <div class="chips" id="history-years"></div>
       <input type="search" id="history-search" class="input" placeholder="Поиск по типу, источнику…">
@@ -245,8 +260,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=13"></script>
-  <script src="debts.js?v=13"></script>
-  <script src="app.js?v=13"></script>
+  <script src="banks.js?v=14"></script>
+  <script src="debts.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

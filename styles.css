@@ -286,3 +286,6 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
 #debt-closed-toggle { display: block; margin: 10px auto 0; }
 .sheet-amount.plain { color: var(--text); }
 #exp-more { margin-top: 6px; }
+
+#download-box .period { margin: 4px 0 12px; }
+#download-box .chips { margin-bottom: 4px; }

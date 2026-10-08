@@ -779,9 +779,11 @@ $('#sheet-debt').addEventListener('click', () => { const id = sheetData.pendingI
  * Excel в формате листа data из income.report.xlsx: заголовки с B2,
  * дата разбита на «day N» / месяц / год. Файл можно снова загрузить через импорт.
  */
-async function downloadIncomes() {
+async function downloadIncomes(from, to) {
+  const list = incomes.filter((r) => r[1] >= from && r[1] <= to);
+  if (!list.length) { toast('За этот период поступлений нет'); return; }
   const rows = [[], [null, 'data: day', 'data: month', 'data: year', 'amount', 'curriency', 'type', 'monetary form', 'income type']];
-  [...incomes].sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)).forEach((r) => {
+  list.sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)).forEach((r) => {
     const [y, m, d] = r[1].split('-');
     rows.push([null, `day ${+d}`, MONTHS_EN[+m - 1], +y, r[2], r[3], r[4], r[5], r[6]]);
   });
@@ -789,7 +791,7 @@ async function downloadIncomes() {
   ws['!cols'] = [2, 9, 11, 7, 9, 9, 13, 14, 12].map((wch) => ({ wch }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'data');
-  const name = `hamyoon-data-${today()}.xlsx`;
+  const name = `hamyoon-data-${from}_${to}.xlsx`;
   const file = new File([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], name,
     { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   // на телефоне — системное меню «Поделиться / Сохранить в файлы», иначе обычная загрузка
@@ -804,7 +806,40 @@ async function downloadIncomes() {
   toast(`Скачивается ${name}`);
 }
 window.hamyonBuildIncomesFile = downloadIncomes; // для отладки
-$('#btn-download').addEventListener('click', () => downloadIncomes().catch((e) => toast('Не удалось скачать: ' + e.message)));
+// Выбор периода: готовые варианты или свои даты
+function dlPreset(p) {
+  const now = today();
+  const y = year(now);
+  const first = incomes.reduce((m, r) => (r[1] < m ? r[1] : m), now);
+  const range = {
+    all: [first, now], year: [`${y}-01-01`, now], prev: [`${y - 1}-01-01`, `${y - 1}-12-31`], month: [`${ym(now)}-01`, now],
+  }[p];
+  $('#dl-from').value = range[0];
+  $('#dl-to').value = range[1];
+  document.querySelectorAll('#dl-presets button').forEach((b) => b.classList.toggle('on', b.dataset.p === p));
+  dlCount();
+}
+function dlCount() {
+  const from = $('#dl-from').value; const to = $('#dl-to').value;
+  const n = incomes.filter((r) => r[1] >= from && r[1] <= to).length;
+  $('#dl-count').textContent = from && to ? `записей: ${n}` : '';
+}
+$('#btn-download').addEventListener('click', () => {
+  const box = $('#download-box');
+  box.classList.toggle('hidden');
+  if (!box.classList.contains('hidden') && !$('#dl-from').value) dlPreset('all');
+});
+$('#dl-presets').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) dlPreset(b.dataset.p); });
+['#dl-from', '#dl-to'].forEach((s) => $(s).addEventListener('change', () => {
+  document.querySelectorAll('#dl-presets button').forEach((b) => b.classList.remove('on'));
+  dlCount();
+}));
+$('#dl-go').addEventListener('click', () => {
+  let from = $('#dl-from').value; let to = $('#dl-to').value;
+  if (!from || !to) return toast('Выберите даты');
+  if (from > to) [from, to] = [to, from];
+  downloadIncomes(from, to).catch((e) => toast('Не удалось скачать: ' + e.message));
+});
 
 /* ================= Импорт / экспорт ================= */
 const recKey = (r) => [r[1], r[2], r[3], r[4] ?? '', r[5] ?? '', r[6] ?? ''].join('|');
