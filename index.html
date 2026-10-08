@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <main id="app">
@@ -76,7 +76,10 @@
       </div>
       <form id="expense-form" class="form hidden" autocomplete="off">
         <label>Сумма
-          <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input big" placeholder="0" required>
+          <div class="amount-row">
+            <input type="number" inputmode="decimal" step="0.01" min="0" name="amount" class="input big" placeholder="0" required>
+            <input type="text" name="cur" class="input cur" maxlength="3" value="EUR" required>
+          </div>
         </label>
         <label>Дата
           <input type="date" name="date" class="input" required>
@@ -270,8 +273,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=16"></script>
-  <script src="debts.js?v=16"></script>
-  <script src="app.js?v=16"></script>
+  <script src="banks.js?v=17"></script>
+  <script src="debts.js?v=17"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

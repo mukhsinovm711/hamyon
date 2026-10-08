@@ -419,7 +419,12 @@ function setAddKind(k) {
   $('#income-form').classList.toggle('hidden', k !== 'income');
   $('#expense-form').classList.toggle('hidden', k !== 'expense');
   $('#form-title').textContent = k === 'income' ? 'Новый доход' : 'Новый расход';
-  if (k === 'expense' && !expForm.elements.date.value) expForm.elements.date.value = today();
+  if (k === 'expense') {
+    if (!expForm.elements.date.value) expForm.elements.date.value = today();
+    // валюта по умолчанию — как у последнего добавленного расхода
+    const last = expenses[expenses.length - 1];
+    if (!expForm.dataset.curTouched) expForm.elements.cur.value = last ? last[3] : mainCurrency();
+  }
 }
 $('#add-kind').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setAddKind(b.dataset.k); });
 
@@ -626,6 +631,16 @@ function expenseMatches(r, q) {
 }
 $('#exp-search').addEventListener('input', renderMore);
 
+// Итог по валютам: «83,00 € + 10,00 $»
+function sumByCur(rows) {
+  const by = {};
+  rows.forEach((r) => { by[r[3]] = (by[r[3]] || 0) + r[2]; });
+  const main = mainCurrency();
+  const curs = Object.keys(by).sort((a, b) => (a === main ? -1 : b === main ? 1 : a < b ? -1 : 1));
+  return curs.map((c) => fmt(Math.round(by[c] * 100) / 100, c)).join(' + ') || fmt(0);
+}
+expForm.elements.cur.addEventListener('input', () => { expForm.dataset.curTouched = '1'; });
+
 function renderMore() {
   const ys = [...new Set(expenses.map((r) => year(r[1])))].sort((a, b) => a - b);
   const now = year(today());
@@ -636,17 +651,17 @@ function renderMore() {
   const q = $('#exp-search').value.trim().toLowerCase();
   const rows = (q ? expenses.filter((r) => expenseMatches(r, q)) : expenses.filter((r) => year(r[1]) === y)).sort(sortByDateDesc);
   const shown = expShowAll || q ? rows : rows.slice(0, EXP_FEED);
-  const monthTotal = (k) => sum(rows.filter((r) => ym(r[1]) === k));
+  const monthTotal = (k) => sumByCur(rows.filter((r) => ym(r[1]) === k));
   const groups = {};
   shown.forEach((r) => (groups[ym(r[1])] = groups[ym(r[1])] || []).push(r));
   $('#exp-more').classList.toggle('hidden', !!q || rows.length <= EXP_FEED);
   $('#exp-more').textContent = expShowAll ? 'Свернуть' : `Показать все (${rows.length})`;
   $('#exp-year').disabled = !!q;
   $('#exp-found').classList.toggle('hidden', !q);
-  $('#exp-found').textContent = `Найдено: ${rows.length} на ${fmt(sum(rows))}`;
+  $('#exp-found').textContent = `Найдено: ${rows.length} на ${sumByCur(rows)}`;
   $('#expense-list').innerHTML = Object.keys(groups).map((k) => {
     const g = groups[k];
-    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${fmt(monthTotal(k))}</span></div>`
+    return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${monthTotal(k)}</span></div>`
       + g.map((r) => { const x = exp(r);
         return `<div class="item pressable" data-detail="exp:${esc(x.id)}"><div><div class="t">${esc(x.note || 'Расход')}</div><div class="s">${fmtDate(x.date)}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
@@ -663,11 +678,14 @@ expForm.addEventListener('submit', (e) => {
   const f = expForm.elements;
   const amount = Math.round(parseFloat(String(f.amount.value).replace(',', '.')) * 100) / 100;
   if (!(amount > 0)) return toast('Введите сумму');
-  expenses.push([uid(), f.date.value, amount, mainCurrency(), f.note.value.trim()]);
+  const cur = f.cur.value.trim().toUpperCase() || mainCurrency();
+  if (!/^[A-Z]{3}$/.test(cur)) return toast('Валюта — три латинские буквы, например EUR');
+  expenses.push([uid(), f.date.value, amount, cur, f.note.value.trim()]);
   Store.save('exp', expenses);
   f.amount.value = ''; f.note.value = ''; f.date.value = today();
   haptic();
-  toast('Расход добавлен: ' + fmt(amount));
+  toast('Расход добавлен: ' + fmt(amount, cur));
+  delete expForm.dataset.curTouched;
   show('more');
 });
 $('#expense-list').addEventListener('click', async (e) => {
