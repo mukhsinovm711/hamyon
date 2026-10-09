@@ -530,8 +530,9 @@ function renderReports() {
     $('#period-from').value = from.toISOString().slice(0, 10);
     calInit = true;
   }
-  const yList = ys.includes(year(now)) ? ys : [...ys, year(now)];
-  yearOptions($('#cal-year'), yList, $('#cal-year').value || year(now));
+  const picked = +$('#cal-year').value;
+  const yList = [...new Set([...ys, year(now), ...(picked ? [picked] : [])])].sort((a, b) => a - b);
+  yearOptions($('#cal-year'), yList, picked || year(now));
   renderCalendar();
   renderPeriod();
   renderStruct();
@@ -563,8 +564,50 @@ function renderCalendar() {
   $('#calendar').innerHTML = html;
 }
 
+// Свайп по календарю: влево — следующий месяц, вправо — предыдущий
+function shiftCalendar(delta) {
+  let m = +$('#cal-month').value + delta;
+  let y = +$('#cal-year').value;
+  if (m > 12) { m = 1; y++; }
+  if (m < 1) { m = 12; y--; }
+  const ysel = $('#cal-year');
+  if (![...ysel.options].some((o) => +o.value === y)) {
+    const list = [...ysel.options].map((o) => +o.value).concat(y).sort((a, b) => a - b);
+    yearOptions(ysel, list, y);
+  }
+  ysel.value = y;
+  $('#cal-month').value = m;
+  renderCalendar();
+  const cal = $('#calendar');
+  cal.classList.remove('slide-left', 'slide-right');
+  void cal.offsetWidth; // перезапуск анимации
+  cal.classList.add(delta > 0 ? 'slide-left' : 'slide-right');
+  try { tg && tg.HapticFeedback.selectionChanged(); } catch (err) {}
+}
+
+let calSwiped = false;
+(function setupCalendarSwipe() {
+  let sx = null; let sy = 0;
+  const cal = $('#calendar');
+  cal.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; calSwiped = false; });
+  // месяц меняется уже во время жеста: так он не теряется, если браузер отменит жест (pointercancel)
+  cal.addEventListener('pointermove', (e) => {
+    if (sx == null) return;
+    const dx = e.clientX - sx; const dy = e.clientY - sy;
+    if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) { sx = null; return; } // это прокрутка страницы
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      sx = null;
+      calSwiped = true; // чтобы отпускание пальца на дне не открыло «＋»
+      shiftCalendar(dx < 0 ? 1 : -1);
+    }
+  });
+  ['pointerup', 'pointercancel'].forEach((ev) => cal.addEventListener(ev, () => { sx = null; }));
+  cal.addEventListener('dragstart', (e) => e.preventDefault());
+})();
+
 // Нажатие на день — как «＋», но с датой этого дня
 $('#calendar').addEventListener('click', (e) => {
+  if (calSwiped) { calSwiped = false; return; }
   const cell = e.target.closest('[data-date]'); if (!cell) return;
   editingId = null;
   show('add');

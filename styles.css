@@ -322,3 +322,10 @@ body.fullscreen .topbar .tb-title { display: block; font-size: 16px; font-weight
 body.fullscreen .topbar .tb-sub { font-size: 10px; }
 body.fullscreen .tabbar { padding-bottom: calc(6px + max(env(safe-area-inset-bottom), var(--hy-safe-bottom))); }
 body.fullscreen { padding-bottom: calc(72px + max(env(safe-area-inset-bottom), var(--hy-safe-bottom))); }
+
+/* Свайп месяцев: вертикальная прокрутка остаётся, горизонтальный жест — наш */
+.cal { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.cal.slide-left { animation: cal-left .22s ease; }
+.cal.slide-right { animation: cal-right .22s ease; }
+@keyframes cal-left { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes cal-right { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
