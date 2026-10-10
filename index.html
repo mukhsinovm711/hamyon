@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -227,6 +227,13 @@
 
       <details class="card fold" id="data-fold">
         <summary><span>⚙️ Данные и резервные копии</span><span class="chev">›</span></summary>
+        <div class="bio-row" id="bio-row">
+          <div>
+            <div class="t" id="bio-title">Face ID для показа доходов</div>
+            <div class="muted small" id="bio-note"></div>
+          </div>
+          <button class="switch" id="bio-switch" role="switch" aria-checked="false" aria-label="Face ID для показа доходов"><i></i></button>
+        </div>
         <div class="actions">
         <label class="btn">
           Импорт из Excel (.xlsx)
@@ -285,8 +292,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=29"></script>
-  <script src="debts.js?v=29"></script>
-  <script src="app.js?v=29"></script>
+  <script src="banks.js?v=30"></script>
+  <script src="debts.js?v=30"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

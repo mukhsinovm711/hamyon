@@ -279,13 +279,82 @@ function applyHideIncome(on) {
   b.setAttribute('aria-label', on ? 'Показать доходы' : 'Скрыть доходы');
   b.title = b.getAttribute('aria-label');
 }
-applyHideIncome(lsGet('hamyon_hide_income') === '1');
-$('#btn-hide-income').addEventListener('click', () => {
+applyHideIncome(lsGet('hamyon_hide_income') === '1' || lsGet('hamyon_bio') === '1');
+$('#btn-hide-income').addEventListener('click', async () => {
   const on = !document.body.classList.contains('hide-income');
+  // показать доходы — только после Face ID, если он включён на этом устройстве
+  if (!on && Bio.enabled() && !(await Bio.verify('Показать доходы в Hamyoon'))) return;
   lsSet('hamyon_hide_income', on ? '1' : '0');
   applyHideIncome(on);
   try { tg && tg.HapticFeedback.selectionChanged(); } catch (e) {}
 });
+
+/* ================= Face ID / отпечаток =================
+ * Биометрия телефона через Telegram BiometricManager (Bot API 7.2+).
+ * Код-пароль Telegram для этого не нужен. В Telegram Desktop биометрии нет —
+ * там переключатель недоступен и всё работает без проверки.
+ * Когда включено: при открытии и при возврате в приложение доходы скрыты,
+ * показать их можно только после проверки.
+ */
+const Bio = {
+  bm: inTelegram && tg.isVersionAtLeast('7.2') ? tg.BiometricManager : null,
+  ready: false,
+  init() {
+    return new Promise((res) => {
+      if (!this.bm) return res();
+      this.bm.init(() => { this.ready = true; res(); });
+    });
+  },
+  available() { return !!(this.ready && this.bm.isBiometricAvailable); },
+  enabled() { return lsGet('hamyon_bio') === '1' && this.available(); },
+  name() {
+    const t = this.bm && this.bm.biometricType;
+    return t === 'face' ? 'Face ID' : t === 'finger' ? 'Отпечаток пальца' : 'Биометрия';
+  },
+  request(reason) { return new Promise((res) => this.bm.requestAccess({ reason }, (granted) => res(!!granted))); },
+  auth(reason) { return new Promise((res) => this.bm.authenticate({ reason }, (ok) => res(!!ok))); },
+  async verify(reason) {
+    if (!this.available()) return true;
+    if (!this.bm.isAccessGranted) {
+      if (this.bm.isAccessRequested) {
+        // доступ уже запрещали — Telegram больше не спросит сам, нужно включить в настройках бота
+        toast(`Разрешите ${this.name()} для Hamyoon в настройках Telegram`);
+        this.bm.openSettings();
+        return false;
+      }
+      if (!(await this.request(reason))) { toast('Доступ к биометрии не разрешён'); return false; }
+    }
+    const ok = await this.auth(reason);
+    if (!ok) { haptic('error'); toast('Проверка не пройдена'); }
+    return ok;
+  },
+};
+
+function renderBio() {
+  const sw = $('#bio-switch');
+  const on = lsGet('hamyon_bio') === '1';
+  $('#bio-title').textContent = `${Bio.available() ? Bio.name() : 'Face ID'} для показа доходов`;
+  sw.setAttribute('aria-checked', String(on && Bio.available()));
+  sw.disabled = !Bio.available();
+  $('#bio-note').textContent = !Bio.available()
+    ? (inTelegram ? 'На этом устройстве биометрия недоступна (например, в Telegram Desktop).' : 'Работает только в Telegram на телефоне.')
+    : on ? 'Доходы скрыты при открытии, показать — после проверки.' : 'Включите, чтобы доходы открывались только после проверки.';
+}
+
+$('#bio-switch').addEventListener('click', async () => {
+  const on = lsGet('hamyon_bio') === '1';
+  // и включение, и выключение подтверждаются биометрией
+  if (!(await Bio.verify(on ? 'Выключить защиту доходов' : 'Включить защиту доходов'))) return;
+  lsSet('hamyon_bio', on ? '0' : '1');
+  if (!on) applyHideIncome(true);
+  haptic();
+  toast(on ? 'Защита доходов выключена' : `${Bio.name()} включён: доходы скрыты`);
+  renderBio();
+});
+
+// приложение ушло в фон — снова скрываем доходы
+document.addEventListener('visibilitychange', () => { if (document.hidden && Bio.enabled()) applyHideIncome(true); });
+Bio.init().then(renderBio);
 
 /* ================= Обзор ================= */
 let chart;
