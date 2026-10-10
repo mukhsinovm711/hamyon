@@ -331,3 +331,21 @@ body.fullscreen { padding-bottom: calc(72px + max(env(safe-area-inset-bottom), v
 @keyframes cal-right { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
 
 #pending-card .hint { margin: -4px 0 6px; }
+
+/* Скрыть доходы: кнопка-глаз в карточке и размытие сумм доходов */
+.hero { position: relative; }
+.eye-btn {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
+  border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .18); color: inherit;
+}
+.eye-btn .eye-closed, body.hide-income .eye-btn .eye-open { display: none; }
+body.hide-income .eye-btn .eye-closed { display: block; }
+body.hide-income :is(
+  .hero-value, .hero-row b, #chart-monthly,
+  #recent .a, #history-list .a, #history-list .group-head span:last-child,
+  #years-table td:not(:first-child), #cal-total b, .cal .d .v,
+  #period-result .stat:first-child b, #period-result .stat:nth-child(3) b,
+  #struct-bars .bar-top > span:last-child, #dl-count
+) { filter: blur(7px); user-select: none; pointer-events: none; }
+body.hide-income .cal .d.has { background: var(--bg); }

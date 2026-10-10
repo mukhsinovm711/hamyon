@@ -269,6 +269,24 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+/* ================= Скрыть доходы =================
+ * Суммы доходов размываются по всему приложению (от посторонних глаз).
+ * Настройка хранится на этом устройстве.
+ */
+function applyHideIncome(on) {
+  document.body.classList.toggle('hide-income', on);
+  const b = $('#btn-hide-income');
+  b.setAttribute('aria-label', on ? 'Показать доходы' : 'Скрыть доходы');
+  b.title = b.getAttribute('aria-label');
+}
+applyHideIncome(lsGet('hamyon_hide_income') === '1');
+$('#btn-hide-income').addEventListener('click', () => {
+  const on = !document.body.classList.contains('hide-income');
+  lsSet('hamyon_hide_income', on ? '1' : '0');
+  applyHideIncome(on);
+  try { tg && tg.HapticFeedback.selectionChanged(); } catch (e) {}
+});
+
 /* ================= Обзор ================= */
 let chart;
 let chartRange = '12';
@@ -643,7 +661,10 @@ let structYears = null;
 
 function renderStruct() {
   const all = years();
-  if (!structYears) structYears = new Set([all.includes(year(today())) ? year(today()) : all[all.length - 1]]);
+  // выбор сбрасывается, если в нём не осталось лет с данными (например, после первого импорта)
+  if (!structYears || ![...structYears].some((y) => all.includes(y))) {
+    structYears = new Set([all.includes(year(today())) ? year(today()) : all[all.length - 1]]);
+  }
   const color = (y) => YEAR_COLORS[all.indexOf(y) % YEAR_COLORS.length];
   const allOn = all.length > 1 && all.every((y) => structYears.has(y));
   $('#struct-years').innerHTML = (all.length > 1 ? `<button data-y="all" class="${allOn ? 'on' : ''}">Все</button>` : '')
