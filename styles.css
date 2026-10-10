@@ -365,3 +365,6 @@ body.hide-income .cal .d.has { background: var(--bg); }
 .switch[aria-checked="true"] { background: #2eb85c; }
 .switch[aria-checked="true"] i { transform: translateX(20px); }
 .switch:disabled { opacity: .4; cursor: default; }
+
+/* Пока доходы скрыты, вкладка «Доход» в «＋» под замком */
+body.hide-income #add-kind [data-k="income"]::after { content: ' 🔒'; font-size: 11px; }

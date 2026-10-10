@@ -273,19 +273,28 @@ function toast(msg) {
  * Суммы доходов размываются по всему приложению (от посторонних глаз).
  * Настройка хранится на этом устройстве.
  */
+const incomeHidden = () => document.body.classList.contains('hide-income');
+
 function applyHideIncome(on) {
   document.body.classList.toggle('hide-income', on);
+  // открытая форма дохода тоже выдаёт суммы — переключаемся на расход
+  if (on && currentView === 'add' && !$('#income-form').classList.contains('hidden')) { editingId = null; resetForm(); }
   const b = $('#btn-hide-income');
   b.setAttribute('aria-label', on ? 'Показать доходы' : 'Скрыть доходы');
   b.title = b.getAttribute('aria-label');
 }
 applyHideIncome(lsGet('hamyon_hide_income') === '1' || lsGet('hamyon_bio') === '1');
+// Показать доходы: после Face ID, если он включён на этом устройстве
+async function revealIncome(reason) {
+  if (!incomeHidden()) return true;
+  if (Bio.enabled() && !(await Bio.verify(reason))) return false;
+  lsSet('hamyon_hide_income', '0');
+  applyHideIncome(false);
+  return true;
+}
 $('#btn-hide-income').addEventListener('click', async () => {
-  const on = !document.body.classList.contains('hide-income');
-  // показать доходы — только после Face ID, если он включён на этом устройстве
-  if (!on && Bio.enabled() && !(await Bio.verify('Показать доходы в Hamyoon'))) return;
-  lsSet('hamyon_hide_income', on ? '1' : '0');
-  applyHideIncome(on);
+  if (incomeHidden()) { if (!(await revealIncome('Показать доходы в Hamyoon'))) return; }
+  else { lsSet('hamyon_hide_income', '1'); applyHideIncome(true); }
   try { tg && tg.HapticFeedback.selectionChanged(); } catch (e) {}
 });
 
@@ -465,8 +474,9 @@ $('#history-years').addEventListener('click', (e) => {
   historyYear = b.dataset.y; renderHistory();
 });
 $('#history-search').addEventListener('input', renderHistory);
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const it = e.target.closest('[data-edit]'); if (!it) return;
+  if (!(await revealIncome('Открыть поступление'))) return;
   openEdit(it.dataset.edit);
 });
 
@@ -518,8 +528,10 @@ function fillForm(x) {
 
 // «＋»: доход или расход
 let addKind = 'income';
-function setAddKind(k) {
-  addKind = k;
+function setAddKind(want) {
+  // пока доходы скрыты, форма дохода не показывается; выбор «Доход» при этом запоминается
+  const k = want === 'income' && incomeHidden() ? 'expense' : want;
+  addKind = want;
   document.querySelectorAll('#add-kind button').forEach((b) => b.classList.toggle('on', b.dataset.k === k));
   $('#income-form').classList.toggle('hidden', k !== 'income');
   $('#expense-form').classList.toggle('hidden', k !== 'expense');
@@ -532,7 +544,11 @@ function setAddKind(k) {
     if (!expForm.dataset.curTouched) expForm.elements.cur.value = last ? last[3] : mainCurrency();
   }
 }
-$('#add-kind').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setAddKind(b.dataset.k); });
+$('#add-kind').addEventListener('click', async (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.k === 'income' && !(await revealIncome('Открыть форму дохода'))) return;
+  setAddKind(b.dataset.k);
+});
 
 function resetForm() {
   editingId = null;
