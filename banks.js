@@ -322,7 +322,7 @@ const Bank = (() => {
    * Файлы, которые вы отправили боту и подтвердили «Да», лежат в очереди Worker'а.
    * Приложение забирает их при открытии и разбирает теми же обработчиками.
    */
-  const INBOX_URL = ''; // адрес Cloudflare Worker, например https://hamyoon-bot.<имя>.workers.dev
+  const INBOX_URL = 'https://hamyoon-bot.mukhsinovm.workers.dev'; // Cloudflare Worker (worker/)
   let pulling = false;
 
   async function pullInbox() {

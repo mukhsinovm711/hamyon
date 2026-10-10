@@ -2,3 +2,5 @@
 *.xlsx
 test-statements/
 *.pdf
+.wrangler/
+node_modules/
