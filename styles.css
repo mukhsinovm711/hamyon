@@ -338,6 +338,7 @@ body.fullscreen { padding-bottom: calc(72px + max(env(safe-area-inset-bottom), v
   position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
   border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
   background: rgba(255, 255, 255, .18); color: inherit;
+  z-index: 2; /* полупрозрачная подпись и размытые суммы создают свои слои и иначе перекрывают кнопку */
 }
 .eye-btn .eye-closed, body.hide-income .eye-btn .eye-open { display: none; }
 body.hide-income .eye-btn .eye-closed { display: block; }
