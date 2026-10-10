@@ -444,7 +444,7 @@ function incomeItem(r) {
   const x = inc(r);
   return `<div class="item" data-edit="${esc(x.id)}">
     <div><div class="t">${esc(label(TYPE_LABELS, x.type))}</div>
-    <div class="s">${fmtDate(x.date)} · ${esc(label(SOURCE_LABELS, x.source))} · ${esc(label(FORM_LABELS, x.form))}</div></div>
+    <div class="s">${fmtDate(x.date)} · ${esc(label(SOURCE_LABELS, x.source))}<span class="inc-form"> · ${esc(label(FORM_LABELS, x.form))}</span></div></div>
     <div class="a">${fmt(x.amount, x.cur)}</div></div>`;
 }
 
@@ -769,6 +769,7 @@ function renderStruct() {
   const entries = Object.entries(agg).sort((a, b) => b[1].total - a[1].total);
   const total = entries.reduce((s, e) => s + e[1].total, 0);
   const max = entries.length ? entries[0][1].total : 1;
+  $('#struct-bars').classList.toggle('by-form', structBy === 'form');
   $('#struct-bars').innerHTML = entries.map(([k, v]) => `
     <div class="bar"><div class="bar-top"><span>${esc(label(labels, k))}</span>
       <span>${fmt(Math.round(v.total * 100) / 100)} <span class="muted">· ${Math.round((v.total / total) * 100)}%</span></span></div>

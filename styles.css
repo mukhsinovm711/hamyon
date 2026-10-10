@@ -368,3 +368,8 @@ body.hide-income .cal .d.has { background: var(--bg); }
 
 /* Пока доходы скрыты, вкладка «Доход» в «＋» под замком */
 body.hide-income #add-kind [data-k="income"]::after { content: ' 🔒'; font-size: 11px; }
+
+/* Скрытые доходы: форма оплаты (наличные/карта) и доли в «Структуре» тоже не видны */
+body.hide-income .inc-form { display: none; }
+body.hide-income #struct-bars .bar-track > * { visibility: hidden; }
+body.hide-income #struct-bars.by-form .bar-top > span:first-child { filter: blur(6px); }
