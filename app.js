@@ -789,10 +789,10 @@ $('#expense-list').addEventListener('click', async (e) => {
 });
 
 /* ================= Подробности операции =================
- * Удержание строки 1,5 секунды открывает окно со всеми данными.
+ * Удержание строки 1 секунду открывает окно со всеми данными.
  * Сумму можно изменить: в расчётах участвует новая, исходная хранится отдельно.
  */
-const HOLD_MS = 1500;
+const HOLD_MS = 1000;
 let sheetData = null;
 
 // rec[2] — сумма для расчётов, rec[origIdx] — исходная сумма (пока не вернули её обратно)
@@ -905,7 +905,7 @@ $('#sheet-to-debt').addEventListener('click', async () => {
   render();
 });
 
-// Удержание: строка заполняется подсветкой, через 1,5 секунды открывается окно
+// Удержание: строка заполняется подсветкой, через 1 секунду открывается окно
 (function setupLongPress() {
   let timer = null; let el = null; let sx = 0; let sy = 0;
   const cancel = () => { clearTimeout(timer); if (el) el.classList.remove('pressing'); el = null; };
@@ -1134,4 +1134,7 @@ function render() {
   render();
   const back = Object.values(Store.restored).reduce((a, b) => a + b, 0);
   if (back) toast(`Восстановлено записей с устройства: ${back}`);
+  // выписки, отправленные боту в чат
+  Bank.pullInbox();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) Bank.pullInbox(); });
 })();

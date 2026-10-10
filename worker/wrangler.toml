@@ -1,0 +1,14 @@
+# Cloudflare Worker: бот Hamyoon и очередь импорта выписок.
+# Секреты задаются командой `npx wrangler secret put …`, в файл не пишутся.
+name = "hamyoon-bot"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+OWNER_ID = "800306134"
+WEBAPP_URL = "https://mukhsinovm711.github.io/hamyon/"
+APP_ORIGIN = "https://mukhsinovm711.github.io"
+
+[[kv_namespaces]]
+binding = "INBOX"
+id = "REPLACE_WITH_KV_ID"

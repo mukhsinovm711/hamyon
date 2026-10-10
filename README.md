@@ -38,3 +38,26 @@
 python -m http.server 8765
 ```
 и открыть http://localhost:8765 — работает без Telegram (данные в браузере).
+
+## Импорт выписок через чат с ботом
+
+Бот работает на бесплатном Cloudflare Worker (`worker/`): принимает файл в чате, спрашивает
+«Импортировать?», после «Да» кладёт файл в очередь (Cloudflare KV). Приложение при открытии
+забирает очередь, разбирает выписки и добавляет операции в «Ожидают подтверждения».
+Запросы приложения подписаны initData Telegram и принимаются только от владельца (`OWNER_ID`).
+
+Развёртывание (один раз, из папки `worker`):
+
+```bash
+npx wrangler login
+npx wrangler kv namespace create INBOX      # id вписать в wrangler.toml
+npx wrangler secret put BOT_TOKEN           # токен из @BotFather
+npx wrangler secret put WEBHOOK_SECRET      # любая случайная строка
+npx wrangler deploy                         # выдаст адрес https://hamyoon-bot.<имя>.workers.dev
+```
+
+Затем:
+1. Подключить вебхук: `https://api.telegram.org/bot<TOKEN>/setWebhook?url=<адрес>/tg&secret_token=<WEBHOOK_SECRET>`.
+2. Вписать адрес Worker'а в `INBOX_URL` в `banks.js` и выложить приложение.
+
+После подключения вебхука `bot.py` больше не нужен: `/start` и кнопку открытия обрабатывает Worker.

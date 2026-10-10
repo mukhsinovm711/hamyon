@@ -245,8 +245,6 @@ const Bank = (() => {
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
       ${amountHtml(p[2], done ? null : p[9], p[3])}
       ${done ? `<span class="status">${p.how === 'debt' ? '🤝 В долгах' : '✓ Обработан'}</span>` : `<div class="pbtns">
-        <button class="pb debt" data-debt="${esc(p[0])}" aria-label="Записать как долг">🤝</button>
-        <button class="pb ok" data-ok="${esc(p[0])}" aria-label="Подтвердить">✓</button>
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
       </div>`}</div>`;
   }
@@ -320,6 +318,46 @@ const Bank = (() => {
     });
   }
 
+  /* ---------- Очередь импорта из чата с ботом ----------
+   * Файлы, которые вы отправили боту и подтвердили «Да», лежат в очереди Worker'а.
+   * Приложение забирает их при открытии и разбирает теми же обработчиками.
+   */
+  const INBOX_URL = ''; // адрес Cloudflare Worker, например https://hamyoon-bot.<имя>.workers.dev
+  let pulling = false;
+
+  async function pullInbox() {
+    if (!INBOX_URL || !inTelegram || pulling) return;
+    pulling = true;
+    const auth = { Authorization: 'tma ' + tg.initData };
+    try {
+      const { items = [] } = await fetch(INBOX_URL + '/inbox', { headers: auth }).then((r) => r.json());
+      let added = 0;
+      for (const it of items) {
+        const report = { id: it.id };
+        try {
+          const res = await fetch(`${INBOX_URL}/file?id=${encodeURIComponent(it.id)}`, { headers: auth });
+          if (!res.ok) throw new Error('файл недоступен');
+          const r = await importFile(new File([await res.blob()], it.name));
+          Object.assign(report, r);
+          added += r.added;
+        } catch (e) {
+          report.error = e.message;
+        }
+        await fetch(INBOX_URL + '/inbox/done', {
+          method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(report),
+        });
+      }
+      if (items.length) {
+        toast(added ? `Из чата с ботом: новых расходов ${added}` : 'Выписки из чата обработаны, новых расходов нет');
+        window.render();
+      }
+    } catch (e) {
+      console.warn('inbox', e);
+    } finally {
+      pulling = false;
+    }
+  }
+
   async function load() {
     pending = await Store.load('pend');
   }
@@ -364,5 +402,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

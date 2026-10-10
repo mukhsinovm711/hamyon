@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -181,6 +181,7 @@
       </div>
       <div class="card hidden" id="pending-card">
         <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3></div>
+        <p class="muted small hint">Удерживайте операцию 1 секунду, чтобы подтвердить её или записать как долг. ✕ — отклонить.</p>
         <div id="pending-list" class="list"></div>
         <div class="amount-row" id="pending-actions">
           <button class="btn" id="pend-all-ok">Подтвердить все</button>
@@ -283,8 +284,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=25"></script>
-  <script src="debts.js?v=25"></script>
-  <script src="app.js?v=25"></script>
+  <script src="banks.js?v=26"></script>
+  <script src="debts.js?v=26"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>

@@ -227,7 +227,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--h
   background: linear-gradient(var(--soft), var(--soft)) no-repeat left / 0% 100%;
   border-radius: 8px;
 }
-.pressable.pressing { background-size: 100% 100%; transition: background-size 1.5s linear; }
+.pressable.pressing { background-size: 100% 100%; transition: background-size 1s linear; }
 
 .sheet-backdrop {
   position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0);
@@ -329,3 +329,5 @@ body.fullscreen { padding-bottom: calc(72px + max(env(safe-area-inset-bottom), v
 .cal.slide-right { animation: cal-right .22s ease; }
 @keyframes cal-left { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes cal-right { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+
+#pending-card .hint { margin: -4px 0 6px; }
