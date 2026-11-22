@@ -52,7 +52,37 @@ const Bank = (() => {
   const RV_KINDS = {
     'Торговая точка': 'card', 'Перевод': 'transfer', 'Другое': 'transfer', 'Комиссия': 'fee', 'Снятие наличных': 'cash',
     'Банкомат': 'cash', 'Обмен валюты': 'exchange', 'Пополнение': 'topup',
+    // выписка на английском
+    Merchant: 'card', Others: 'transfer', Transfers: 'transfer', Transfer: 'transfer', Fees: 'fee', Fee: 'fee',
+    ATM: 'cash', 'Cash withdrawal': 'cash', Exchange: 'exchange', 'Top-up': 'topup', Topup: 'topup',
   };
+
+  // Выписка Revolut на английском: «Oct 18, 2026», «-€40.00», «€1,234.56»
+  const EN_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  const EN_DATE = /^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),\s*(\d{4})$/;
+  const MONEY_EN = /^(-?)\s*([€$£])\s*(\d{1,3}(?:,\d{3})*\.\d{2})$/;
+
+  function enDate(s) {
+    const m = s.match(EN_DATE);
+    const mon = m && EN_MONTHS[m[1].toLowerCase()];
+    return mon ? `${m[3]}-${pad(mon)}-${pad(m[2])}` : null;
+  }
+
+  // Сумма в любом из форматов → { neg, amount, sym }
+  function rvMoney(s) {
+    let m = s.match(MONEY);
+    if (m) return { neg: m[1] === '-', amount: num(m[2]), sym: m[3] };
+    m = s.match(MONEY_EN);
+    if (m) return { neg: m[1] === '-', amount: Number(m[3].replace(/,/g, '')), sym: m[2] };
+    return null;
+  }
+
+  // Баланс для ключа операции — всегда в русском виде («19,66€»), чтобы русская и английская
+  // выписки за один период давали одинаковые ключи и не дублировали друг друга
+  function rvBalKey(s) {
+    const m = rvMoney(s || '');
+    return m ? `${m.neg ? '-' : ''}${m.amount.toFixed(2).replace('.', ',')}${m.sym}` : s || '';
+  }
 
   function ruDate(s) {
     const m = s.match(RU_DATE);
@@ -88,23 +118,23 @@ const Bank = (() => {
     for (const row of rows) {
       const { cells } = row;
       const line = cells.map((c) => c.s).join(' ');
-      if (/Выписка по операциям/.test(line)) { inOps = true; last = null; continue; }
+      if (/Выписка по операциям|Transaction statement/i.test(line)) { inOps = true; last = null; continue; }
       if (!inOps) continue;
-      const head = cells.find((c) => c.s === 'Категория');
+      const head = cells.find((c) => c.s === 'Категория' || c.s === 'Category');
       if (head) { catX = head.x; continue; }
-      if (/^Итого/.test(cells[0].s)) { inOps = false; last = null; continue; }
+      if (/^(Итого|Total)$/.test(cells[0].s)) { inOps = false; last = null; continue; }
       const descCol = (c) => catX == null || c.x < catX - 5;
-      const date = ruDate(cells[0].s);
-      const mi = cells.findIndex((c) => MONEY.test(c.s));
+      const date = ruDate(cells[0].s) || enDate(cells[0].s);
+      const mi = cells.findIndex((c) => rvMoney(c.s));
       if (date && mi > 0) {
         const mid = cells.slice(1, mi);
         const desc = mid.filter(descCol).map((c) => c.s);
         let cat = mid.filter((c) => !descCol(c)).map((c) => c.s).join(' ');
         if (catX == null && desc.length > 1) cat = desc.pop();
-        const m = cells[mi].s.match(MONEY);
+        const m = rvMoney(cells[mi].s);
         const after = cells.slice(mi + 1).map((c) => c.s);
         last = {
-          date, desc: desc.join(' '), cat, neg: m[1] === '-', amount: num(m[2]), cur: SIGN[m[3]],
+          date, desc: desc.join(' '), cat, neg: m.neg, amount: m.amount, cur: SIGN[m.sym],
           bal: after[0] || '', fees: after[3] || '',
         };
         lastRow = row;
@@ -124,9 +154,10 @@ const Bank = (() => {
   function revolutOps(list) {
     return list.filter((o) => o.neg && RV_KINDS[o.cat] !== 'exchange').map((o) => ({
       date: o.date, amount: o.amount, cur: o.cur, note: o.desc, bank: 'Revolut',
-      kind: RV_KINDS[o.cat] || (/^(Перевод|To )/i.test(o.desc) ? 'transfer' : 'other'),
-      key: `rv|${o.date}|${o.desc}|${o.amount}|${o.cur}|${o.bal}`,
-      details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', /^0,00/.test(o.fees || '') ? '' : o.fees]],
+      kind: RV_KINDS[o.cat] || (/^(Перевод|To |Transfer to )/i.test(o.desc) ? 'transfer' : 'other'),
+      // описание в ключе — в русском виде: английская выписка пишет «Transfer to X» вместо «Перевод, получатель: X»
+      key: `rv|${o.date}|${o.desc.replace(/^Transfer to\s+/i, 'Перевод, получатель: ')}|${o.amount}|${o.cur}|${rvBalKey(o.bal)}`,
+      details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', (rvMoney(o.fees || '') || {}).amount ? o.fees : '']],
     }));
   }
 
@@ -283,7 +314,7 @@ const Bank = (() => {
    * Перевод на это имя (в любом порядке слов, с «To …» / «Перевод, получатель: …») — «Свой счёт».
    */
   const normName = (s) => String(s || '').toUpperCase()
-    .replace(/^(TO\s+|ПЕРЕВОД,\s*ПОЛУЧАТЕЛЬ:\s*|\*)/, '')
+    .replace(/^(TRANSFER\s+TO\s+|TO\s+|ПЕРЕВОД,\s*ПОЛУЧАТЕЛЬ:\s*|\*)/, '')
     .replace(/[^A-ZА-ЯЁ\s]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
 
   function isOwn(name) {
