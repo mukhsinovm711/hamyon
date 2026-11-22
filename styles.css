@@ -403,3 +403,14 @@ body.selecting { padding-bottom: calc(190px + max(env(safe-area-inset-bottom), v
 
 /* Переводы другим людям — серым, покупки и оплаты — красным */
 .a.neg.transfer { color: var(--hint); }
+
+/* Свернуть список ожидания */
+.head-actions { display: flex; align-items: center; gap: 10px; }
+.chev-btn {
+  width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; background: var(--soft); color: var(--accent);
+}
+.chev-btn svg { transition: transform .2s; }
+#pending-card.collapsed .chev-btn svg { transform: rotate(180deg); }
+#pending-card.collapsed > :not(.card-head) { display: none !important; }
+#pending-card.collapsed .card-head { margin-bottom: 0; }

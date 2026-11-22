@@ -11,6 +11,7 @@ const Bank = (() => {
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   let pending = [];   // [id, date, amount, cur, note, bank, kind, key, details, сумма по выписке, если изменена]
   let processed = []; // уже записанные операции из последней загруженной выписки
+  let collapsed = false;      // список ожидания свёрнут (запоминается на устройстве, читается в setup)
   let selecting = false;      // режим выбора нескольких операций
   const selected = new Set(); // id выбранных операций
 
@@ -350,7 +351,11 @@ const Bank = (() => {
       : '<div class="empty-state">Новых расходов нет</div>';
     if (!n) setSelecting(false);
     document.getElementById('pending-actions').classList.toggle('hidden', !n || selecting);
-    document.getElementById('select-toggle').classList.toggle('hidden', !n);
+    document.getElementById('select-toggle').classList.toggle('hidden', !n || collapsed);
+    document.getElementById('pending-card').classList.toggle('collapsed', collapsed);
+    const cb = document.getElementById('pending-collapse');
+    cb.setAttribute('aria-label', collapsed ? 'Развернуть список' : 'Свернуть список');
+    cb.title = cb.getAttribute('aria-label');
     document.getElementById('select-toggle').textContent = selecting ? 'Готово' : 'Выбрать';
     document.getElementById('pending-hint').classList.toggle('hidden', selecting);
     document.getElementById('select-head').classList.toggle('hidden', !selecting);
@@ -382,6 +387,13 @@ const Bank = (() => {
       } finally { btn.classList.remove('busy'); }
     });
     document.getElementById('select-toggle').addEventListener('click', () => { setSelecting(!selecting); window.render(); });
+    collapsed = lsGet('hamyon_pending_collapsed') === '1';
+    document.getElementById('pending-collapse').addEventListener('click', () => {
+      collapsed = !collapsed;
+      lsSet('hamyon_pending_collapsed', collapsed ? '1' : '0');
+      if (collapsed && selecting) setSelecting(false);
+      window.render();
+    });
     document.getElementById('select-cancel').addEventListener('click', () => { setSelecting(false); window.render(); });
     document.getElementById('select-all').addEventListener('click', () => {
       const all = pending.every((p) => selected.has(p[0]));
