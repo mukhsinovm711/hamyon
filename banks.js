@@ -47,8 +47,9 @@ const Bank = (() => {
   const RU_DATE = /^(\d{1,2})\s+([а-яё]+)\.?\s+(\d{4})\s*г?\.?$/i;
   const MONEY = /^(-?)\s*(\d{1,3}(?:[\s  ]\d{3})*,\d{2})\s*([€$£])$/;
   const SIGN = { '€': 'EUR', '$': 'USD', '£': 'GBP' };
+  // «Другое» — так Revolut помечает переводы людям и на другие счета («To …», «Перевод, получатель: …»)
   const RV_KINDS = {
-    'Торговая точка': 'card', 'Перевод': 'transfer', 'Комиссия': 'fee', 'Снятие наличных': 'cash',
+    'Торговая точка': 'card', 'Перевод': 'transfer', 'Другое': 'transfer', 'Комиссия': 'fee', 'Снятие наличных': 'cash',
     'Банкомат': 'cash', 'Обмен валюты': 'exchange', 'Пополнение': 'topup',
   };
 
@@ -114,12 +115,39 @@ const Bank = (() => {
         last = null;
       }
     }
-    return ops.filter((o) => o.neg && RV_KINDS[o.cat] !== 'exchange').map((o) => ({
+    return revolutOps(ops);
+  }
+
+  // Общее для PDF и CSV сводной выписки: одинаковые колонки → одинаковые ключи,
+  // поэтому PDF и CSV за один период не дают дублей
+  function revolutOps(list) {
+    return list.filter((o) => o.neg && RV_KINDS[o.cat] !== 'exchange').map((o) => ({
       date: o.date, amount: o.amount, cur: o.cur, note: o.desc, bank: 'Revolut',
-      kind: RV_KINDS[o.cat] || (/^Перевод/i.test(o.desc) ? 'transfer' : 'other'),
+      kind: RV_KINDS[o.cat] || (/^(Перевод|To )/i.test(o.desc) ? 'transfer' : 'other'),
       key: `rv|${o.date}|${o.desc}|${o.amount}|${o.cur}|${o.bal}`,
-      details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', /^0,00/.test(o.fees) ? '' : o.fees]],
+      details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', /^0,00/.test(o.fees || '') ? '' : o.fees]],
     }));
+  }
+
+  /* ---------- Revolut: CSV сводной выписки на русском ----------
+   * Дата, Описание, Категория, «Поступления / Списания», Баланс, Удержанный налог, Прочие налоги, Комиссии.
+   * Счетов (EUR, USD…) может быть несколько: у каждого своя таблица, заканчивается строкой «Итого».
+   */
+  function parseRevolutRuTable(rows) {
+    if (!rows.some((r) => r.some((c) => /Revolut Bank/i.test(String(c ?? ''))))) return null;
+    const ops = [];
+    let inTable = false;
+    rows.forEach((r) => {
+      const c = r.map((v) => String(v ?? '').trim());
+      if (c[0] === 'Дата' && c[1] === 'Описание') { inTable = true; return; }
+      if (!inTable) return;
+      if (/^Итого/.test(c[0])) { inTable = false; return; }
+      const date = ruDate(c[0]);
+      const m = (c[3] || '').match(MONEY);
+      if (!date || !m) return;
+      ops.push({ date, desc: c[1], cat: c[2], neg: m[1] === '-', amount: num(m[2]), cur: SIGN[m[3]], bal: c[4], fees: c[7] });
+    });
+    return revolutOps(ops);
   }
 
   /* ---------- TBC Bank (Узбекистан): PDF «История транзакций по карте» ----------
@@ -258,9 +286,13 @@ const Bank = (() => {
       const rows = await pdfRows(buf);
       ops = parseTbcPdf(rows) || parseRevolutPdf(rows);
     } else {
-      const wb = XLSX.read(buf, { type: 'array', raw: /\.csv$/i.test(file.name) });
+      // CSV банков — UTF-8 без BOM: SheetJS прочитал бы кириллицу как Latin-1, поэтому декодируем сами
+      const isCsv = /\.csv$/i.test(file.name);
+      const wb = isCsv
+        ? XLSX.read(new TextDecoder('utf-8').decode(buf), { type: 'string', raw: true })
+        : XLSX.read(buf, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: true });
-      ops = parseWise(rows) || parseRevolutTable(rows);
+      ops = parseWise(rows) || parseRevolutTable(rows) || parseRevolutRuTable(rows);
     }
     if (!ops) throw new Error('Файл не похож на выписку Revolut или Wise');
     let added = 0; let waiting = 0; let backfilled = false;
@@ -536,5 +568,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseTbcPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseRevolutRuTable, parseTbcPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();
