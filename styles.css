@@ -400,3 +400,6 @@ body.selecting { padding-bottom: calc(190px + max(env(safe-area-inset-bottom), v
 .select-btns .btn { white-space: nowrap; }
 .select-btns .btn.ghost { flex: 0 0 auto; width: auto; padding: 10px 12px; }
 #select-all { white-space: nowrap; flex: 0 0 auto; }
+
+/* Переводы другим людям — серым, покупки и оплаты — красным */
+.a.neg.transfer { color: var(--hint); }

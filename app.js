@@ -866,7 +866,7 @@ function renderMore() {
       + g.map((r) => { const x = exp(r);
         const [name, bank] = splitBank(x.note);
         return `<div class="item pressable exp-item" data-detail="exp:${esc(x.id)}"><div class="pmain"><div class="t">${esc(name || 'Расход')}</div><div class="s">${fmtDate(x.date)}${bank ? ' · ' + bankTag(bank) : ''}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
-          <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur)}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
+          <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur, isTransferExpense(r))}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : m ? 'Расходов за этот месяц нет' : 'Расходов за этот год нет'}</div>`;
 
@@ -913,10 +913,19 @@ function applyAmount(rec, origIdx, value) {
   if (rec[origIdx] === value) rec[origIdx] = null;
 }
 
-const amountHtml = (amount, orig, cur) => `<div class="a neg">−${fmt(amount, cur)}${orig != null
+// transfer = true: перевод другому человеку — сумма серым, а не красным
+const amountHtml = (amount, orig, cur, transfer) => `<div class="a neg${transfer ? ' transfer' : ''}">−${fmt(amount, cur)}${orig != null
   ? `<s class="orig">−${fmt(orig, cur)}</s>` : ''}</div>`;
 
-// Расход: [id, date, amount, cur, note, ключ операции, детали, исходная сумма, форма оплаты]
+// Расход из выписки — перевод? Вид операции хранится в [9]; у старых записей — по подробностям выписки
+function isTransferExpense(r) {
+  if (r[9]) return r[9] === 'transfer';
+  return (r[6] || []).some(([k, v]) => (k === 'Тип в Wise' && v === 'TRANSFER') || (k === 'Тип операции' && v === 'TRANSFER')
+    || (k === 'Тип транзакции' && /^Перевод/.test(v)) || (k === 'Категория банка' && /^Перевод/.test(v)))
+    || /^Перевод/.test(r[4] || '');
+}
+
+// Расход: [id, date, amount, cur, note, ключ операции, детали, исходная сумма, форма оплаты, вид операции из выписки]
 let expFormValue = null;
 function renderExpFormSeg(selected) {
   expFormValue = selected;

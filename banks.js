@@ -290,7 +290,7 @@ const Bank = (() => {
     const set = new Set(ids);
     if (accept) {
       pending.filter((p) => set.has(p[0]))
-        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || [], p[9] ?? null, 'card']));
+        .forEach((p) => expenses.push([uid(), p[1], p[2], p[3], `${p[4]} · ${p[5]}`, p[7], p[8] || [], p[9] ?? null, 'card', p[6]]));
     }
     pending = pending.filter((p) => !set.has(p[0]));
     persist(accept);
@@ -304,12 +304,12 @@ const Bank = (() => {
       <span class="check" aria-hidden="true"></span>
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
-      ${amountHtml(p[2], p[9], p[3])}</div>`;
+      ${amountHtml(p[2], p[9], p[3], p[6] === 'transfer')}</div>`;
     }
     return `<div class="pitem pressable${done ? ' done' : ''}" data-detail="${done ? 'proc' : 'pend'}:${esc(p[0])}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
-      ${amountHtml(p[2], done ? null : p[9], p[3])}
+      ${amountHtml(p[2], done ? null : p[9], p[3], p[6] === 'transfer')}
       ${done ? `<span class="status">${p.how === 'debt' ? '🤝 В долгах' : '✓ Обработан'}</span>` : `<div class="pbtns">
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
       </div>`}</div>`;
