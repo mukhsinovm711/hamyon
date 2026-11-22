@@ -11,6 +11,7 @@ const Bank = (() => {
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   let pending = [];   // [id, date, amount, cur, note, bank, kind, key, details, сумма по выписке, если изменена]
   let processed = []; // уже записанные операции из последней загруженной выписки
+  let ownNames = [];          // имя владельца счетов (из PDF-выписок или вручную) — для «Свой счёт»
   let collapsed = false;      // список ожидания свёрнут (запоминается на устройстве, читается в setup)
   let selecting = false;      // режим выбора нескольких операций
   const selected = new Set(); // id выбранных операций
@@ -277,6 +278,37 @@ const Bank = (() => {
     return ops;
   }
 
+  /* ---------- Переводы самому себе ----------
+   * Имя владельца печатается в шапке PDF-выписок Revolut и TBC: «MUKHAMMADSHER MUKHSINOV».
+   * Перевод на это имя (в любом порядке слов, с «To …» / «Перевод, получатель: …») — «Свой счёт».
+   */
+  const normName = (s) => String(s || '').toUpperCase()
+    .replace(/^(TO\s+|ПЕРЕВОД,\s*ПОЛУЧАТЕЛЬ:\s*|\*)/, '')
+    .replace(/[^A-ZА-ЯЁ\s]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+
+  function isOwn(name) {
+    const n = normName(name);
+    return !!n && ownNames.some((o) => normName(o) === n);
+  }
+
+  // Имя владельца из шапки PDF: первая строка из одних заглавных букв (2+ слова)
+  function pdfOwner(rows) {
+    const head = rows.filter((r) => r.page === 1).slice(0, 15);
+    const r = head.find((x) => {
+      const t = x.cells.map((c) => c.s).join(' ').trim();
+      return t.length <= 60 && /^[A-ZА-ЯЁ][A-ZА-ЯЁ'’-]+(\s+[A-ZА-ЯЁ][A-ZА-ЯЁ'’-]+)+$/.test(t) && !/BANK/.test(t);
+    });
+    return r ? r.cells.map((c) => c.s).join(' ').trim() : null;
+  }
+
+  function setOwnNames(list) {
+    ownNames = [...new Set(list.map((s) => s.trim().toUpperCase()).filter(Boolean))];
+    Store.save('own', ownNames);
+  }
+  function learnOwner(name) {
+    if (name && !ownNames.some((o) => normName(o) === normName(name))) setOwnNames([...ownNames, name]);
+  }
+
   /* ---------- Загрузка файла ---------- */
   async function importFile(file) {
     const buf = await file.arrayBuffer();
@@ -285,6 +317,7 @@ const Bank = (() => {
     if (isPdf) {
       const rows = await pdfRows(buf);
       ops = parseTbcPdf(rows) || parseRevolutPdf(rows);
+      if (ops) learnOwner(pdfOwner(rows));
     } else {
       // CSV банков — UTF-8 без BOM: SheetJS прочитал бы кириллицу как Latin-1, поэтому декодируем сами
       const isCsv = /\.csv$/i.test(file.name);
@@ -294,7 +327,7 @@ const Bank = (() => {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: true });
       ops = parseWise(rows) || parseRevolutTable(rows) || parseRevolutRuTable(rows);
     }
-    if (!ops) throw new Error('Файл не похож на выписку Revolut или Wise');
+    if (!ops) throw new Error('Файл не похож на выписку Revolut, Wise или TBC');
     let added = 0; let waiting = 0; let backfilled = false;
     processed = [];
     ops.forEach((o) => {
@@ -331,17 +364,20 @@ const Bank = (() => {
   }
 
   /* ---------- Отрисовка ---------- */
+  const ownTransfer = (p) => p[6] === 'transfer' && isOwn(p[4]);
+  const kindLabel = (p) => (ownTransfer(p) ? '<span class="tag own">Свой счёт</span>' : KIND_LABELS[p[6]] || '');
+
   function pendingItem(p, done) {
     if (selecting && !done) {
       return `<div class="pitem pick${selected.has(p[0]) ? ' on' : ''}" data-pick="${esc(p[0])}">
       <span class="check" aria-hidden="true"></span>
       <div class="pmain"><div class="t">${esc(p[4])}</div>
-        <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
+        <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${kindLabel(p)}</div></div>
       ${amountHtml(p[2], p[9], p[3], p[6] === 'transfer')}</div>`;
     }
     return `<div class="pitem pressable${done ? ' done' : ''}" data-detail="${done ? 'proc' : 'pend'}:${esc(p[0])}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
-        <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
+        <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${kindLabel(p)}</div></div>
       ${amountHtml(p[2], done ? null : p[9], p[3], p[6] === 'transfer')}
       ${done ? `<span class="status">${p.how === 'debt' ? '🤝 В долгах' : '✓ Обработан'}</span>` : `<div class="pbtns">
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
@@ -390,6 +426,10 @@ const Bank = (() => {
     cb.title = cb.getAttribute('aria-label');
     document.getElementById('select-toggle').textContent = selecting ? 'Готово' : 'Выбрать';
     document.getElementById('pending-hint').classList.toggle('hidden', selecting);
+    const own = pending.filter(ownTransfer);
+    const ro = document.getElementById('reject-own');
+    ro.classList.toggle('hidden', !own.length || selecting || collapsed);
+    ro.textContent = `Отклонить переводы себе (${own.length})`;
     document.getElementById('select-head').classList.toggle('hidden', !selecting);
     renderSelectBar();
     document.getElementById('processed-box').classList.toggle('hidden', !processed.length);
@@ -419,6 +459,14 @@ const Bank = (() => {
       } finally { btn.classList.remove('busy'); }
     });
     document.getElementById('select-toggle').addEventListener('click', () => { setSelecting(!selecting); window.render(); });
+    document.getElementById('reject-own').addEventListener('click', async () => {
+      const own = pending.filter(ownTransfer);
+      if (!own.length) return;
+      if (!(await confirmBox(`Отклонить переводы на свой счёт: ${own.length} на ${sumByCur(own)}? Это не расходы.`))) return;
+      resolve(own.map((p) => p[0]), false);
+      toast(`Отклонено переводов себе: ${own.length}`);
+      window.render();
+    });
     collapsed = lsGet('hamyon_pending_collapsed') === '1';
     document.getElementById('pending-collapse').addEventListener('click', () => {
       collapsed = !collapsed;
@@ -525,7 +573,7 @@ const Bank = (() => {
   }
 
   async function load() {
-    pending = await Store.load('pend');
+    [pending, ownNames] = await Promise.all([Store.load('pend'), Store.load('own')]);
   }
 
   // Данные для окна подробностей: { title, amount, cur, fields, pending }
@@ -535,7 +583,7 @@ const Bank = (() => {
     return {
       title: p[4], amount: p[2], orig: kind === 'pend' ? p[9] ?? null : null, cur: p[3],
       pendingId: kind === 'pend' ? p[0] : null, ref: kind === 'pend' ? { type: 'pend', id } : null,
-      fields: [['Дата', fmtDate(p[1])], ['Банк', p[5]], ['Вид', KIND_LABELS[p[6]] || ''],
+      fields: [['Дата', fmtDate(p[1])], ['Банк', p[5]], ['Вид', ownTransfer(p) ? 'Перевод на свой счёт' : KIND_LABELS[p[6]] || ''],
         ['Статус', kind === 'pend' ? 'Ожидает подтверждения' : '✓ Обработан'],
         ...(p[8] || [['Описание', p[4]]])],
     };
@@ -568,5 +616,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseRevolutRuTable, parseTbcPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, pullInbox, isOwn, setOwnNames, get ownNames() { return ownNames; }, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseRevolutRuTable, parseTbcPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

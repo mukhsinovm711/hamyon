@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=41">
+  <link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -186,6 +186,7 @@
             <button class="link" id="select-toggle">Выбрать</button>
             <button class="chev-btn" id="pending-collapse" aria-label="Свернуть список" title="Свернуть список"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
           </div></div>
+        <button class="link hidden" id="reject-own"></button>
         <p class="muted small hint" id="pending-hint">Удерживайте операцию 1 секунду, чтобы подтвердить её или записать как долг. ✕ — отклонить.</p>
         <div class="select-head hidden" id="select-head">
           <button class="link" id="select-all">Выбрать все</button>
@@ -242,6 +243,10 @@
           </div>
           <button class="switch" id="bio-switch" role="switch" aria-checked="false" aria-label="Face ID для показа доходов"><i></i></button>
         </div>
+        <label class="own-row">Ваше имя в выписках
+          <input type="text" id="own-names" class="input" placeholder="Например: IVAN PETROV" autocomplete="off">
+          <span class="muted small">Переводы на это имя помечаются «Свой счёт». Заполняется само из PDF-выписок Revolut и TBC; несколько имён — через запятую.</span>
+        </label>
         <div class="actions">
         <label class="btn">
           Импорт из Excel (.xlsx)
@@ -309,8 +314,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=41"></script>
-  <script src="debts.js?v=41"></script>
-  <script src="app.js?v=41"></script>
+  <script src="banks.js?v=42"></script>
+  <script src="debts.js?v=42"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

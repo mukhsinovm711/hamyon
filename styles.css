@@ -414,3 +414,9 @@ body.selecting { padding-bottom: calc(190px + max(env(safe-area-inset-bottom), v
 #pending-card.collapsed .chev-btn svg { transform: rotate(180deg); }
 #pending-card.collapsed > :not(.card-head) { display: none !important; }
 #pending-card.collapsed .card-head { margin-bottom: 0; }
+
+/* Переводы самому себе */
+.tag.own { background: color-mix(in srgb, var(--hint) 22%, transparent); color: var(--hint); }
+#reject-own { display: block; margin: -2px 0 8px; }
+.own-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--hint); margin-bottom: 14px; }
+.own-row .input { color: var(--text); }

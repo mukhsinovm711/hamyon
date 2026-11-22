@@ -343,6 +343,17 @@ const Bio = {
   },
 };
 
+// Имя владельца для «Свой счёт»
+function renderOwnNames() {
+  const inp = $('#own-names');
+  if (document.activeElement !== inp) inp.value = Bank.ownNames.join(', ');
+}
+$('#own-names').addEventListener('change', () => {
+  Bank.setOwnNames($('#own-names').value.split(','));
+  toast('Имя сохранено');
+  render();
+});
+
 function renderBio() {
   const sw = $('#bio-switch');
   const on = lsGet('hamyon_bio') === '1';
@@ -865,11 +876,13 @@ function renderMore() {
     return `<div class="group-head"><span>${MONTHS_RU[+k.slice(5) - 1]}${q ? ' ' + k.slice(0, 4) : ''}</span><span>${monthTotal(k)}</span></div>`
       + g.map((r) => { const x = exp(r);
         const [name, bank] = splitBank(x.note);
-        return `<div class="item pressable exp-item" data-detail="exp:${esc(x.id)}"><div class="pmain"><div class="t">${esc(name || 'Расход')}</div><div class="s">${fmtDate(x.date)}${bank ? ' · ' + bankTag(bank) : ''}${r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
+        const own = isTransferExpense(r) && Bank.isOwn(name);
+        return `<div class="item pressable exp-item" data-detail="exp:${esc(x.id)}"><div class="pmain"><div class="t">${esc(name || 'Расход')}</div><div class="s">${fmtDate(x.date)}${bank ? ' · ' + bankTag(bank) : ''}${own ? ' <span class="tag own">Свой счёт</span>' : r[8] ? ' · ' + label(FORM_LABELS, r[8]) : ''}</div></div>
           <div style="display:flex;align-items:center;gap:6px">${amountHtml(x.amount, r[7], x.cur, isTransferExpense(r))}<button class="x" data-del-exp="${esc(x.id)}">×</button></div></div>`;
       }).join('');
   }).join('') || `<div class="empty-state">${q ? 'Ничего не найдено' : m ? 'Расходов за этот месяц нет' : 'Расходов за этот год нет'}</div>`;
 
+  renderOwnNames();
   const cloudInfo = Store.summary();
   $('#storage-info').textContent = `${cloudInfo} Доходов: ${incomes.length}, расходов: ${expenses.length}. Приложение загружено с ${location.host}.`;
 }
