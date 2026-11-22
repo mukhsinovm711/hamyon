@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=34">
+  <link rel="stylesheet" href="styles.css?v=37">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -181,8 +181,13 @@
         <p class="muted small">Revolut — PDF или CSV, Wise — XLSX или CSV, TBC Bank — PDF. Найденные списания попадут в список ожидания и запишутся в расходы только после вашего подтверждения.</p>
       </div>
       <div class="card hidden" id="pending-card">
-        <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3></div>
-        <p class="muted small hint">Удерживайте операцию 1 секунду, чтобы подтвердить её или записать как долг. ✕ — отклонить.</p>
+        <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3>
+          <button class="link" id="select-toggle">Выбрать</button></div>
+        <p class="muted small hint" id="pending-hint">Удерживайте операцию 1 секунду, чтобы подтвердить её или записать как долг. ✕ — отклонить.</p>
+        <div class="select-head hidden" id="select-head">
+          <button class="link" id="select-all">Выбрать все</button>
+          <span class="muted small">Нажимайте на операции, чтобы отметить их</span>
+        </div>
         <div id="pending-list" class="list"></div>
         <div class="amount-row" id="pending-actions">
           <button class="btn" id="pend-all-ok">Подтвердить все</button>
@@ -291,9 +296,18 @@
     </div>
   </div>
 
+  <div class="select-bar hidden" id="select-bar">
+    <div class="select-info"><b id="select-count">Выбрано: 0</b><span class="muted small" id="select-sum"></span></div>
+    <div class="select-btns">
+      <button class="btn ok" id="select-ok">✓ Подтвердить</button>
+      <button class="btn danger" id="select-no">✕ Отклонить</button>
+      <button class="btn ghost" id="select-cancel">Отмена</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=34"></script>
-  <script src="debts.js?v=34"></script>
-  <script src="app.js?v=34"></script>
+  <script src="banks.js?v=37"></script>
+  <script src="debts.js?v=37"></script>
+  <script src="app.js?v=37"></script>
 </body>
 </html>

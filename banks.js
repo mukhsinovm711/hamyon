@@ -11,6 +11,8 @@ const Bank = (() => {
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   let pending = [];   // [id, date, amount, cur, note, bank, kind, key, details, сумма по выписке, если изменена]
   let processed = []; // уже записанные операции из последней загруженной выписки
+  let selecting = false;      // режим выбора нескольких операций
+  const selected = new Set(); // id выбранных операций
 
   const KIND_LABELS = { card: 'Покупка', transfer: 'Перевод', fee: 'Комиссия', cash: 'Снятие наличных', payment: 'Оплата услуг', other: 'Списание' };
   const pad = (n) => String(n).padStart(2, '0');
@@ -297,6 +299,13 @@ const Bank = (() => {
 
   /* ---------- Отрисовка ---------- */
   function pendingItem(p, done) {
+    if (selecting && !done) {
+      return `<div class="pitem pick${selected.has(p[0]) ? ' on' : ''}" data-pick="${esc(p[0])}">
+      <span class="check" aria-hidden="true"></span>
+      <div class="pmain"><div class="t">${esc(p[4])}</div>
+        <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
+      ${amountHtml(p[2], p[9], p[3])}</div>`;
+    }
     return `<div class="pitem pressable${done ? ' done' : ''}" data-detail="${done ? 'proc' : 'pend'}:${esc(p[0])}">
       <div class="pmain"><div class="t">${esc(p[4])}</div>
         <div class="s">${fmtDate(p[1])} · <span class="tag ${p[5].toLowerCase()}">${esc(p[5])}</span> ${KIND_LABELS[p[6]] || ''}</div></div>
@@ -304,6 +313,26 @@ const Bank = (() => {
       ${done ? `<span class="status">${p.how === 'debt' ? '🤝 В долгах' : '✓ Обработан'}</span>` : `<div class="pbtns">
         <button class="pb no" data-no="${esc(p[0])}" aria-label="Отклонить">✕</button>
       </div>`}</div>`;
+  }
+
+  /* ---------- Выбор нескольких операций ---------- */
+  function setSelecting(on) {
+    selecting = on;
+    selected.clear();
+    document.body.classList.toggle('selecting', on);
+  }
+
+  function renderSelectBar() {
+    const bar = document.getElementById('select-bar');
+    // панель видна только в режиме выбора и на вкладке «Ещё»
+    bar.classList.toggle('hidden', !selecting || currentView !== 'more');
+    const rows = pending.filter((p) => selected.has(p[0]));
+    document.getElementById('select-count').textContent = `Выбрано: ${rows.length}`;
+    document.getElementById('select-sum').textContent = rows.length ? sumByCur(rows) : '';
+    document.getElementById('select-ok').disabled = !rows.length;
+    document.getElementById('select-no').disabled = !rows.length;
+    const all = pending.length && rows.length === pending.length;
+    document.getElementById('select-all').textContent = all ? 'Снять все' : 'Выбрать все';
   }
 
   function render() {
@@ -319,7 +348,13 @@ const Bank = (() => {
     document.getElementById('pending-list').innerHTML = n
       ? [...pending].sort(sortByDateDesc).map((p) => pendingItem(p)).join('')
       : '<div class="empty-state">Новых расходов нет</div>';
-    document.getElementById('pending-actions').classList.toggle('hidden', !n);
+    if (!n) setSelecting(false);
+    document.getElementById('pending-actions').classList.toggle('hidden', !n || selecting);
+    document.getElementById('select-toggle').classList.toggle('hidden', !n);
+    document.getElementById('select-toggle').textContent = selecting ? 'Готово' : 'Выбрать';
+    document.getElementById('pending-hint').classList.toggle('hidden', selecting);
+    document.getElementById('select-head').classList.toggle('hidden', !selecting);
+    renderSelectBar();
     document.getElementById('processed-box').classList.toggle('hidden', !processed.length);
     document.getElementById('processed-count').textContent = processed.length;
     document.getElementById('processed-list').innerHTML = [...processed].sort(sortByDateDesc)
@@ -346,7 +381,37 @@ const Bank = (() => {
         toast(err.message);
       } finally { btn.classList.remove('busy'); }
     });
+    document.getElementById('select-toggle').addEventListener('click', () => { setSelecting(!selecting); window.render(); });
+    document.getElementById('select-cancel').addEventListener('click', () => { setSelecting(false); window.render(); });
+    document.getElementById('select-all').addEventListener('click', () => {
+      const all = pending.every((p) => selected.has(p[0]));
+      selected.clear();
+      if (!all) pending.forEach((p) => selected.add(p[0]));
+      window.render();
+    });
+    const resolveSelected = async (accept) => {
+      const ids = [...selected];
+      if (!ids.length) return;
+      const sumText = sumByCur(pending.filter((p) => selected.has(p[0])));
+      if (!(await confirmBox(`${accept ? 'Записать в расходы' : 'Отклонить'} выбранные: ${ids.length} на ${sumText}?`))) return;
+      resolve(ids, accept);
+      setSelecting(false);
+      toast(accept ? `Записано в расходы: ${ids.length}` : `Отклонено: ${ids.length}`);
+      window.render();
+    };
+    document.getElementById('select-ok').addEventListener('click', () => resolveSelected(true));
+    document.getElementById('select-no').addEventListener('click', () => resolveSelected(false));
+
     document.getElementById('pending-list').addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-pick]');
+      if (pick) {
+        const id = pick.dataset.pick;
+        if (selected.has(id)) selected.delete(id); else selected.add(id);
+        pick.classList.toggle('on', selected.has(id));
+        try { tg && tg.HapticFeedback.selectionChanged(); } catch (err) {}
+        renderSelectBar();
+        return;
+      }
       const debt = e.target.closest('[data-debt]');
       if (debt) { toDebt(debt.dataset.debt); return; }
       const ok = e.target.closest('[data-ok]'); const no = e.target.closest('[data-no]');
