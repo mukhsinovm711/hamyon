@@ -215,10 +215,14 @@ function mainCurrency() {
   return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'EUR';
 }
 
+// Валюты, где копейки на практике не встречаются: целые суммы без «,00»
+const WHOLE_CURRENCIES = ['UZS'];
+
 function fmt(n, cur) {
   cur = cur || mainCurrency();
+  const whole = WHOLE_CURRENCIES.includes(cur) && Number.isInteger(n) ? { minimumFractionDigits: 0 } : {};
   try {
-    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n);
+    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: cur, maximumFractionDigits: 2, ...whole }).format(n);
   } catch (e) {
     return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ' + cur;
   }
@@ -824,7 +828,7 @@ function sumByCur(rows) {
 expForm.elements.cur.addEventListener('input', () => { expForm.dataset.curTouched = '1'; });
 
 // «Delicio · Revolut» → ['Delicio', 'Revolut']: банк показывается цветной меткой
-const BANKS = ['Revolut', 'Wise'];
+const BANKS = ['Revolut', 'Wise', 'TBC'];
 function splitBank(note) {
   const i = (note || '').lastIndexOf(' · ');
   return i > 0 && BANKS.includes(note.slice(i + 3)) ? [note.slice(0, i), note.slice(i + 3)] : [note, null];

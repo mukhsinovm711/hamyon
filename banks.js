@@ -12,7 +12,7 @@ const Bank = (() => {
   let pending = [];   // [id, date, amount, cur, note, bank, kind, key, details, сумма по выписке, если изменена]
   let processed = []; // уже записанные операции из последней загруженной выписки
 
-  const KIND_LABELS = { card: 'Покупка', transfer: 'Перевод', fee: 'Комиссия', cash: 'Снятие наличных', other: 'Списание' };
+  const KIND_LABELS = { card: 'Покупка', transfer: 'Перевод', fee: 'Комиссия', cash: 'Снятие наличных', payment: 'Оплата услуг', other: 'Списание' };
   const pad = (n) => String(n).padStart(2, '0');
   const round2 = (n) => Math.round(n * 100) / 100;
   const norm = (v) => String(v ?? '').trim().toLowerCase();
@@ -77,7 +77,7 @@ const Bank = (() => {
   }
 
   function parseRevolutPdf(rows) {
-    if (!rows.some((r) => r.cells.some((c) => /Revolut/i.test(c.s)))) return null;
+    if (!rows.some((r) => r.cells.some((c) => /Revolut Bank/i.test(c.s)))) return null;
     const ops = [];
     let inOps = false; let catX = null; let last = null; let lastRow = null;
     for (const row of rows) {
@@ -117,6 +117,62 @@ const Bank = (() => {
       key: `rv|${o.date}|${o.desc}|${o.amount}|${o.cur}|${o.bal}`,
       details: [['Категория банка', o.cat], ['Баланс после', o.bal], ['Комиссия', /^0,00/.test(o.fees) ? '' : o.fees]],
     }));
+  }
+
+  /* ---------- TBC Bank (Узбекистан): PDF «История транзакций по карте» ----------
+   * Таблица с фиксированными колонками; длинные ячейки («Транзакция по / карте», имена)
+   * переносятся на строки выше и ниже основной строки с ID операции.
+   */
+  const TBC_COLS = [ // [колонка, начало по X]
+    ['id', 0], ['dir', 80], ['type', 130], ['amount', 200], ['fact', 270], ['time', 340],
+    ['settle', 420], ['recipient', 485], ['sender', 570], ['company', 660], ['status', 755],
+  ];
+  const TBC_HEAD = new Set(['ID', 'Тип', 'Сумма', 'Фактическая', 'Дата/время', 'Дата и время', 'Тип транзакции',
+    'Имя получателя', 'Имя отправителя', 'Компания', 'Статус', 'транзакции', 'операции', 'сумма']);
+  const TBC_KINDS = {
+    'Транзакция по карте': 'card', 'Онлайн-транзакция': 'card', 'Оплата': 'payment', 'Перевод с номером карты': 'transfer',
+  };
+
+  function parseTbcPdf(rows) {
+    const text = rows.slice(0, 15).map((r) => r.cells.map((c) => c.s).join(' ')).join('\n');
+    if (!/TBC BANK/i.test(text) || !/История транзакций по карте/i.test(text)) return null;
+    const card = (text.match(/\*{4}[\s*]*(\d{4})/) || [])[1];
+    const colOf = (x) => { let k = TBC_COLS[0][0]; TBC_COLS.forEach(([name, from]) => { if (x >= from) k = name; }); return k; };
+    const ops = [];
+    const pages = [...new Set(rows.map((r) => r.page))];
+    pages.forEach((page) => {
+      const pr = rows.filter((r) => r.page === page);
+      const anchors = pr.filter((r) => r.cells[0].x < 80 && /^\d{8,}$/.test(r.cells[0].s));
+      if (!anchors.length) return;
+      // строки-переносы — к ближайшей строке с ID (не дальше 10 pt по высоте); заголовок таблицы пропускаем
+      const groups = new Map(anchors.map((a) => [a, [a]]));
+      pr.forEach((r) => {
+        if (groups.has(r) || r.cells.some((c) => TBC_HEAD.has(c.s))) return;
+        let best = null; let dist = 11;
+        anchors.forEach((a) => { const d = Math.abs(a.y - r.y); if (d < dist) { dist = d; best = a; } });
+        if (best) groups.get(best).push(r);
+      });
+      groups.forEach((lines) => {
+        const col = {};
+        lines.sort((a, b) => b.y - a.y).forEach((l) => l.cells.forEach((c) => {
+          const k = colOf(c.x); col[k] = col[k] ? `${col[k]} ${c.s}` : c.s;
+        }));
+        const amount = (col.fact || col.amount || '').match(/([\d\s]+(?:[.,]\d{1,2})?)\s*([A-Z]{3})/);
+        const dt = (col.time || '').match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2})/);
+        const type = (col.type || '').replace(/-\s+/g, '-').trim();
+        if (col.dir !== 'Расходы' || col.status !== 'Завершено' || !amount || !dt) return;
+        if (/своими картами/i.test(type)) return; // перевод между своими картами — не расход
+        const company = col.company && col.company !== 'Unknown' ? col.company : '';
+        const date = `${dt[3]}-${dt[2]}-${dt[1]}`;
+        ops.push({
+          date, amount: num(amount[1]), cur: amount[2], note: company || col.recipient || type || 'Списание', bank: 'TBC',
+          kind: TBC_KINDS[type] || 'other', key: `tbc|${col.id}`,
+          details: [['ID операции', col.id], ['Тип транзакции', type], ['Время', dt[4]], ['Дата списания', col.settle],
+            ['Получатель', col.recipient], ['Компания', company], ['Карта', card ? '•••• ' + card : ''], ['Статус', col.status]],
+        });
+      });
+    });
+    return ops;
   }
 
   /* ---------- Revolut: CSV/XLSX-выгрузка (Type, Product, Started Date, …) ---------- */
@@ -196,7 +252,8 @@ const Bank = (() => {
     const isPdf = new TextDecoder().decode(buf.slice(0, 5)) === '%PDF-';
     let ops;
     if (isPdf) {
-      ops = parseRevolutPdf(await pdfRows(buf));
+      const rows = await pdfRows(buf);
+      ops = parseTbcPdf(rows) || parseRevolutPdf(rows);
     } else {
       const wb = XLSX.read(buf, { type: 'array', raw: /\.csv$/i.test(file.name) });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: null, raw: true });
@@ -402,5 +459,5 @@ const Bank = (() => {
     window.render();
   }
 
-  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
+  return { load, setup, render, pullInbox, detailOf, decide, toDebt, setAmount, keyOf, KIND_LABELS, importFile, parseRevolutPdf, parseTbcPdf, parseWise, parseRevolutTable, pdfRows, get pending() { return pending; } };
 })();

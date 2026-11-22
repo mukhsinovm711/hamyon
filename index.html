@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=34">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -173,12 +173,12 @@
     <section class="view" id="view-more">
       <h2>Расходы</h2>
       <div class="card">
-        <div class="card-head"><h3>Выписки банков</h3><span class="muted small">Revolut · Wise</span></div>
+        <div class="card-head"><h3>Выписки банков</h3><span class="muted small">Revolut · Wise · TBC</span></div>
         <label class="btn primary" id="statement-label">
           <span class="when-idle">Загрузить выписку</span><span class="when-busy">Читаю выписку…</span>
           <input type="file" id="file-statement" accept=".pdf,.xlsx,.xls,.csv" hidden>
         </label>
-        <p class="muted small">Revolut — PDF или CSV, Wise — XLSX или CSV. Найденные списания попадут в список ожидания и запишутся в расходы только после вашего подтверждения.</p>
+        <p class="muted small">Revolut — PDF или CSV, Wise — XLSX или CSV, TBC Bank — PDF. Найденные списания попадут в список ожидания и запишутся в расходы только после вашего подтверждения.</p>
       </div>
       <div class="card hidden" id="pending-card">
         <div class="card-head"><h3>Ожидают подтверждения <span id="pending-count"></span></h3></div>
@@ -292,8 +292,8 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="banks.js?v=32"></script>
-  <script src="debts.js?v=32"></script>
-  <script src="app.js?v=32"></script>
+  <script src="banks.js?v=34"></script>
+  <script src="debts.js?v=34"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>

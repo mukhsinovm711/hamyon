@@ -45,8 +45,8 @@ async function webhook(request, env) {
   if (msg) {
     if (msg.from?.id !== owner) return ok(); // бот только для владельца
     if (msg.document) await askImport(env, msg);
-    else if ((msg.text || '').startsWith('/start')) await sendOpen(env, msg.chat.id, '💰 Hamyoon — учёт доходов и расходов.\nОтправьте сюда выписку Revolut (PDF, CSV) или Wise (XLSX, CSV), и я добавлю её в приложение.');
-    else await tg(env, 'sendMessage', { chat_id: msg.chat.id, text: 'Отправьте выписку Revolut (PDF, CSV) или Wise (XLSX, CSV) файлом — я предложу её импортировать.' });
+    else if ((msg.text || '').startsWith('/start')) await sendOpen(env, msg.chat.id, '💰 Hamyoon — учёт доходов и расходов.\nОтправьте сюда выписку Revolut (PDF, CSV), Wise (XLSX, CSV) или TBC Bank (PDF), и я добавлю её в приложение.');
+    else await tg(env, 'sendMessage', { chat_id: msg.chat.id, text: 'Отправьте выписку Revolut (PDF, CSV), Wise (XLSX, CSV) или TBC Bank (PDF) файлом — я предложу её импортировать.' });
     return ok();
   }
 
@@ -83,7 +83,7 @@ async function askImport(env, msg) {
   const doc = msg.document;
   const name = doc.file_name || 'файл';
   if (!FILE_TYPES.test(name)) {
-    await tg(env, 'sendMessage', { chat_id: msg.chat.id, reply_to_message_id: msg.message_id, text: 'Поддерживаются выписки Revolut (PDF, CSV) и Wise (XLSX, CSV).' });
+    await tg(env, 'sendMessage', { chat_id: msg.chat.id, reply_to_message_id: msg.message_id, text: 'Поддерживаются выписки Revolut (PDF, CSV), Wise (XLSX, CSV) и TBC Bank (PDF).' });
     return;
   }
   if (doc.file_size > MAX_BYTES) {
